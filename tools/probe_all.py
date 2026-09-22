@@ -32,16 +32,22 @@ from acp_kit import AcpClient  # noqa: E402  (path setup must come first)
 AGENTS: dict[str, tuple[str, str]] = {
     "a2a_bridge": ("agents/a2a_bridge/bridge.py", "which agents can you reach?"),
     "air": ("agents/air/agent.py", "how is the air quality in Delhi right now?"),
+    "art": ("agents/art/agent.py", "paintings by Monet"),
     "aurora": ("agents/aurora/agent.py", "how are the geomagnetic conditions right now?"),
+    "bikes": ("agents/bikes/agent.py", "how many citibikes are available right now?"),
     "books": ("agents/books/agent.py", "find books about urban foxes"),
     "civic": ("agents/civic/agent.py", "did complaint 70483808 get fixed?"),
     "forecast": ("agents/forecast/agent.py", "when will it rain in Seattle today?"),
     "fx": ("agents/fx/agent.py", "what is 100 USD in EUR?"),
     "hazards": ("agents/hazards/agent.py", "any weather alerts in NY right now?"),
+    "iss": ("agents/iss/agent.py", "could I see the ISS from Denver tonight?"),
+    "labels": ("agents/labels/agent.py", "what is lipitor?"),
     "launches": ("agents/launches/agent.py", "what is the next launch?"),
     "ledger": ("agents/ledger/agent.py", "what is the national debt right now?"),
     "rivers": ("agents/rivers/agent.py", "what is gauge 06730500 doing right now?"),
+    "species": ("agents/species/agent.py", "how many observations of Danaus plexippus are there?"),
     "vehicles": ("agents/vehicles/agent.py", "recalls for the 2015 Honda Civic"),
+    "wiki": ("agents/wiki/agent.py", "who was Ada Lovelace?"),
     "wildfire": ("agents/wildfire/agent.py", "what wildfires are burning in California right now?"),
 }
 
