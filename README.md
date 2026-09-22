@@ -110,7 +110,9 @@ agents/<name>/tests/test_agent.py
 tests/test_kit.py   protocol tests
 tools/probe.py      one agent, one prompt, real stdio
 tools/probe_all.py  every agent, one live question each
+tools/check_syntax.py  fails on Python 3.12-only syntax, so the 3.10 CI job stays honest
 scripts/            test-all.sh, probe-all.sh
+.github/workflows/  matrix CI: the offline suite on Python 3.10 and 3.12
 MISSING.md          the research log: what exists, what was missing, what was built
 ```
 
