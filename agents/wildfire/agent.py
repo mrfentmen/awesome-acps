@@ -195,8 +195,9 @@ def _fire_line(row: dict, distance: bool = False) -> str:
     contained = row.get("percent_contained")
     containment = "containment not reported" if contained is None else f"{contained:g}% contained"
     place = ", ".join(part for part in (row.get("county"), row.get("state")) if part)
+    where = f" ({place})" if place else ""
     line = (f"  • {row.get('name') or 'unnamed incident'} — {row.get('acres') or 0:,.0f} acres, {containment}"
-            f"{f' ({place})' if place else ''}, discovered {row.get('discovered') or 'date not reported'}")
+            f"{where}, discovered {row.get('discovered') or 'date not reported'}")
     if distance and row.get("distance_miles") is not None:
         line += f", {row['distance_miles']:,.1f} miles away"
     return line

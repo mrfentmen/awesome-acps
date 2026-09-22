@@ -8,6 +8,10 @@ python="${PYTHON:-python3}"
 total=0
 failed_files=0
 
+# CI runs this suite on Python 3.10 too, so catch 3.12-only syntax before it reaches CI.
+"$python" tools/check_syntax.py || exit 1
+echo
+
 for file in tests/test_kit.py agents/*/tests/test_agent.py; do
   output="$("$python" "$file" 2>&1)"
   ran="$(printf '%s\n' "$output" | grep -oE '^Ran [0-9]+' | grep -oE '[0-9]+')"

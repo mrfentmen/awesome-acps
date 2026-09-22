@@ -204,8 +204,9 @@ class LaunchesAgent(AcpAgent):
                 "(read live). Widen the window, or try a shorter search word.",
                 artifact,
             )
-        lines = [f"Next launches in Launch Library{f' matching {result['search']!r}' if result['search'] else ''}"
-                 f"{f' within {result['days']} days' if result['days'] else ''}:"]
+        matching = f" matching {result['search']!r}" if result["search"] else ""
+        within = f" within {result['days']} days" if result["days"] else ""
+        lines = [f"Next launches in Launch Library{matching}{within}:"]
         for launch in result["launches"]:
             lines.append(f"  • {self._one_line(launch)}")
             if launch["window_start"] and launch["window_start"] != launch["net"]:
