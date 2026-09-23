@@ -57,7 +57,9 @@ then built against a keyless public feed that was verified live the same day.
 | `aurora` | no space-weather agent | NOAA SWPC — Kp estimate, 3-day forecast, OVATION grid, alerts |
 | `bikes` | no bike-share agent | Citi Bike GBFS — 2,520 stations, 33,617 bikes joined live |
 | `books` | no catalog agent | Open Library — 48,208 works matched "dune" |
+| `buoys` | no buoy/marine-observation agent | NOAA NDBC realtime2 — 1,353 stations, live waves and water temp |
 | `civic` | first non-coding ACP agent of any kind | NYC Open Data Socrata (`erm2-nwe9`, `bkwf-xfky`) |
+| `floodwatch` | no flood/NWPS gauge agent | NWS NWPS gauge stats (observed, forecast, flood stages) + USGS site search |
 | `forecast` | no weather agent, and no rain-window tool anywhere | Open-Meteo hourly rain probabilities |
 | `fx` | no rates agent | Frankfurter/ECB — USD/EUR 0.87237 |
 | `hazards` | no hazard-feed agent | NWS alerts + USGS quakes |
@@ -65,12 +67,51 @@ then built against a keyless public feed that was verified live the same day.
 | `labels` | no drug-label agent | openFDA — Lipitor label, 5 sections |
 | `launches` | no launch-schedule agent | Launch Library 2 — 369 upcoming launches that day |
 | `ledger` | no fiscal-data agent | US Treasury Fiscal Data (debt, interest, rates, auctions) |
+| `local` | **no ACP agent anywhere reads the machine it runs on** | this machine only: `git rev-parse/status/log` and `lsof -iTCP -sTCP:LISTEN`, read-only |
+| `nature` | no biodiversity-occurrence agent taken from GBIF itself | GBIF occurrence API — 817,344 records for *Danaus plexippus*, 87,502 in Canada |
 | `rivers` | no stream-gauge agent | USGS OGC water API — 0.22 ft^3/s at 06730500 |
 | `species` | no biodiversity agent | iNaturalist — 548,334 observations of *Danaus plexippus* |
+| `surf` | no surf/sea-state agent (a buoy is a point; this answers anywhere) | Open-Meteo marine + wind — 1.7 m at 8.1 s at Pipeline |
 | `vehicles` | no recall/complaint agent | NHTSA recalls, complaints, VIN decoding |
+| `watch` | **no ACP agent streams a feed until cancelled** | USGS all_hour + NOAA Kp-1m + open-notify ISS, polled per round |
 | `wiki` | no encyclopedia agent | Wikipedia summary + Wikidata entities + on-this-day |
 | `wildfire` | no fire-incident agent | NIFC WFIGS current incidents |
 | `a2a_bridge` | no way to use A2A servers from an editor | consumes any A2A agent card (sibling repo) |
+
+## Session 2 — 2026-09-23: six more agents, and what broke on the way
+
+Six agents were added (`nature`, `buoys`, `surf`, `floodwatch`, `local`, `watch`). Every feed
+was probed with a real request before a line of code was written, and four upstream quirks
+changed the design:
+
+1. **The Open-Meteo flood API does not answer for a river.** It returns a model grid cell.
+   It reported 0.45 m^3/s for the Mississippi at St. Louis and 1.34 m^3/s at Baton Rouge,
+   where the real river runs in the thousands. `floodwatch` uses NWS NWPS instead, which
+   publishes observed stage, forecast, and the action/minor/moderate/major stages - for
+   EADM7 on the day: 13.21 ft observed, 16.6 ft forecast, action at 28 ft.
+2. **NWPS has no name search usable per turn.** Its gauge list is ~13 MB and about 50 s to
+   download, and its `?state=` filter is ignored. So a river name is resolved through the
+   USGS site API first, and the answer names the gauge it landed on.
+3. **The USGS name filter is case-sensitive.** `monitoring_location_name LIKE '%Willamette
+   River%'` returns **zero** rows, because USGS stores `WILLAMETTE RIVER AT SALEM, OR`.
+   `LOWER(...) LIKE '%willamette river%'` fixes it and now returns the main-stem gauges
+   (Salem, Albany, Eugene) first. USGS also spells connectors its own way - no site is
+   named "Colorado River at Austin" - so the search widens word by word instead of failing.
+4. **GBIF cannot map common names.** Its own search ranks a clam above *Panthera tigris*
+   for "tiger", `suggest` is Latin-only autocomplete, and Wikidata 429s under repeated use.
+   iNaturalist's taxa endpoint is the resolver that works (exact name, then rank, then a
+   record check), with GBIF still doing the counting.
+
+The same session reused three findings from the first one: open-notify's HTTPS endpoint
+hangs while HTTP answers in 0.2 s (`watch`), NDBC's `MM` means a sensor sent nothing rather
+than zero (`buoys`), and Citi Bike station ids are mostly UUIDs, not numbers (`bikes`).
+
+Two ACP capabilities beyond question-and-answer are now in use for the first time in this
+repo: `session/update` as a live feed, one message per round and each round its own message
+id (`watch`), and `session/cancel` as a real stop that interrupts the sleep between rounds
+rather than after it (`watch`). The third is the session's own working directory: `local`
+reads the folder the editor was launched in, so "what is going on in this repo" needs no
+path at all.
 
 ## The gap map — candidate feeds, all probed live on 2026-09-22
 
@@ -81,10 +122,10 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 
 | Candidate | Feed | Probe result on the day |
 |---|---|---|
-| `nature` | `api.gbif.org/v1/occurrence/search` | 200 — 9,535,182 occurrences for "quercus" (worldwide, beyond iNaturalist) |
-| `buoys` | `ndbc.noaa.gov/data/realtime2/41025.txt` | 200 — live wave height/period, wind, water temp for 4,100 stations |
-| `surf` | `marine-api.open-meteo.com/v1/marine` | 200 — wave height, direction, period for any coast |
-| `floodwatch` | `flood-api.open-meteo.com/v1/flood` | 200 — daily river-discharge forecast (complements `rivers`) |
+| `nature` | `api.gbif.org/v1/occurrence/search` | 200 — 9,535,182 occurrences for "quercus" — **built**, see the 2026-09-23 session below |
+| `buoys` | `ndbc.noaa.gov/data/realtime2/41025.txt` | 200 — live wave height/period, wind, water temp for 1,353 stations — **built** |
+| `surf` | `marine-api.open-meteo.com/v1/marine` | 200 — wave height, direction, period for any coast — **built** |
+| `floodwatch` | `flood-api.open-meteo.com/v1/flood` | 200, **but useless**: see "the flood API was the wrong river" below |
 | `radiation` | `api.safecast.org/measurements.json` | 200 — 52.0 cpm at the latest volunteer sensor |
 | `stargazing` | `7timer.info/bin/api.pl?product=astro` | 200 — cloudcover 9, seeing 7, transparency 3 for the next nights |
 | `almanac` | `api.sunrise-sunset.org/json` | 200 — sunset 2026-09-22T22:54:52Z for New York |
@@ -192,14 +233,16 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 
 Feed-by-feed agents are the first shelf. These are the empty ones after it:
 
-1. **Local-first agents (no network at all).** ACP is an *editor* protocol: an agent that
-   answers "how much disk is left", "what changed in this repo today", "which ports are
-   listening", "what is this branch behind on" is natural — and no ACP agent on the list
-   reads the machine it is running on. Needs ACP `terminal` capability and permission
-   design; genuinely novel.
-2. **Watch agents, not answer agents.** `session/update` can stream. An agent that watches
-   a feed (fire perimeters, air quality, aurora, grid carbon) and pushes updates into the
-   session until cancelled exists nowhere.
+1. ~~**Local-first agents (no network at all).**~~ **Built on 2026-09-23 as
+   [`local`](./agents/local)**: disk, git and listening ports for the session's own working
+   directory, read-only, through an allow-list of two commands. The remaining gaps in this
+   shape: ports *owned* by a project (not the whole machine), dependency freshness, and
+   anything needing the ACP `terminal` capability.
+2. ~~**Watch agents, not answer agents.**~~ **Built on 2026-09-23 as
+   [`watch`](./agents/watch)**: it pushes one message per round and stops on
+   `session/cancel`. Still unbuilt in this shape: watch a *changing condition* (air quality
+   over a threshold, a fire perimeter growing) and watch a feed that genuinely pushes
+   (websocket, SSE) instead of being polled.
 3. **Composite briefings.** One question, several feeds: "brief me for Denver today" =
    air + alerts + fires + launches + grid. Everything needed is built; the shape is new.
 4. **City packs.** New York alone has hundreds of Socrata datasets (subway, restaurant
