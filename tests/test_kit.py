@@ -9,8 +9,10 @@ subprocess and no network.
 
 from __future__ import annotations
 
+import base64
 import queue
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -272,6 +274,155 @@ class KitTests(unittest.TestCase):
         with self.assertRaises(JsonRpcError) as ctx:
             self.client.conn.request("session/prompt", {"sessionId": "sess_nope", "prompt": [{"type": "text", "text": "x"}]})
         self.assertEqual(ctx.exception.code, -32602)
+
+
+class ImageAgent(AcpAgent):
+    """Answers with an image content block, from raw bytes and from base64."""
+
+    name = "pics"
+    title = "Picture Agent"
+    supports_images = True
+
+    def prompt(self, ctx, prompt):
+        ctx.image(b"\x89PNG\r\n\x1a\n", "image/png")
+        ctx.image("QUJD", "image/png", message_id="msg_second")
+        return STOP_END_TURN
+
+
+class FileAgent(AcpAgent):
+    """Calls the client's own fs methods: "write <path> <content>" or "read <path>"."""
+
+    name = "files"
+    title = "File Agent"
+
+    def prompt(self, ctx, prompt):
+        text = prompt_text(prompt)
+        if text.startswith("write "):
+            path, _, content = text[len("write "):].partition(" ")
+            ctx.conn.request("fs/write_text_file",
+                             {"sessionId": ctx.session.id, "path": path, "content": content})
+            ctx.message("wrote")
+            return STOP_END_TURN
+        path = text[len("read "):].strip() if text.startswith("read ") else text
+        result = ctx.conn.request("fs/read_text_file",
+                                  {"sessionId": ctx.session.id, "path": path})
+        ctx.message(result["content"])
+        return STOP_END_TURN
+
+
+def wired(agent, client_kwargs=None):
+    """A served agent plus a started client already past initialize/new_session."""
+    agent_conn, client_conn = connected_pair()
+    instance = agent(agent_conn)
+    threading.Thread(target=agent_conn.serve, daemon=True).start()
+    client = AcpClient(connection=client_conn, **(client_kwargs or {}))
+    client.start()
+    client.initialize()
+    return instance, client, client.new_session(cwd="/tmp")
+
+
+class ImageBlockTests(unittest.TestCase):
+    def test_an_image_capable_agent_says_so_at_initialize(self):
+        _agent, client, _session = wired(ImageAgent)
+        try:
+            capabilities = client.initialized_payload["agentCapabilities"]
+            self.assertTrue(capabilities["promptCapabilities"]["image"])
+        finally:
+            client.stop()
+
+    def test_bytes_are_base64_encoded_and_a_string_passes_through(self):
+        _agent, client, session_id = wired(ImageAgent)
+        try:
+            turn = client.prompt("draw", session_id)
+            images = [update["content"] for update in turn["updates"]
+                      if update.get("content", {}).get("type") == "image"]
+            self.assertEqual(len(images), 2)
+            self.assertEqual(images[0]["mimeType"], "image/png")
+            self.assertEqual(base64.b64decode(images[0]["data"]), b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(images[1]["data"], "QUJD")  # already encoded, left alone
+            self.assertEqual(images[0]["data"], base64.b64encode(b"\x89PNG\r\n\x1a\n").decode())
+            # an image carries no text, so the turn's text stays empty
+            self.assertEqual(turn["text"], "")
+        finally:
+            client.stop()
+
+
+class FileSystemTests(unittest.TestCase):
+    def test_the_filesystem_capability_is_advertised_only_when_it_is_served(self):
+        agent, client, _session = wired(FileAgent)
+        try:
+            self.assertEqual(agent.client_capabilities,
+                             {"fs": {"readTextFile": False, "writeTextFile": False}})
+        finally:
+            client.stop()
+        with tempfile.TemporaryDirectory() as root:
+            agent, client, _session = wired(FileAgent, {"fs_root": root})
+            try:
+                self.assertEqual(agent.client_capabilities,
+                                 {"fs": {"readTextFile": True, "writeTextFile": True}})
+            finally:
+                client.stop()
+
+    def test_a_write_lands_on_disk_and_is_recorded(self):
+        with tempfile.TemporaryDirectory() as root:
+            _agent, client, session_id = wired(FileAgent, {"fs_root": root})
+            try:
+                target = Path(root) / "nested" / "BRIEFING.md"
+                turn = client.prompt(f"write {target} hello there", session_id)
+                self.assertEqual(turn["stopReason"], STOP_END_TURN)
+                self.assertEqual(target.read_text(encoding="utf-8"), "hello there")
+                self.assertEqual(len(client.written_files), 1)
+                self.assertEqual(Path(client.written_files[0]["path"]).resolve(),
+                                 target.resolve())
+            finally:
+                client.stop()
+
+    def test_a_read_returns_the_file_and_only_what_was_asked_for(self):
+        with tempfile.TemporaryDirectory() as root:
+            _agent, client, session_id = wired(FileAgent, {"fs_root": root})
+            try:
+                target = Path(root) / "note.txt"
+                client.prompt(f"write {target} first line", session_id)
+                turn = client.prompt(f"read {target}", session_id)
+                self.assertEqual(turn["text"], "first line")
+                self.assertEqual(Path(client.read_files[0]["path"]).resolve(), target.resolve())
+            finally:
+                client.stop()
+
+    def test_a_path_outside_the_root_is_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            _agent, client, session_id = wired(FileAgent, {"fs_root": root})
+            try:
+                outside = Path(root).parent / "escaped.txt"
+                with self.assertRaises(JsonRpcError) as ctx:
+                    client.prompt(f"write {outside} nope", session_id)
+                message = str(ctx.exception.message)
+                self.assertIn("outside this client's fs_root", message)
+                self.assertFalse(outside.exists())
+                self.assertEqual(client.written_files, [])
+            finally:
+                client.stop()
+
+    def test_without_a_root_the_fs_methods_are_not_implemented(self):
+        _agent, client, session_id = wired(FileAgent)
+        try:
+            with self.assertRaises(JsonRpcError) as ctx:
+                client.prompt("write /tmp/whatever.txt hi", session_id)
+            self.assertEqual(ctx.exception.code, -32601)
+            self.assertEqual(client.written_files, [])
+        finally:
+            client.stop()
+
+    def test_a_read_of_something_missing_is_named(self):
+        with tempfile.TemporaryDirectory() as root:
+            _agent, client, session_id = wired(FileAgent, {"fs_root": root})
+            try:
+                with self.assertRaises(JsonRpcError) as ctx:
+                    client.prompt(f"read {Path(root) / 'nope.txt'}", session_id)
+                self.assertEqual(ctx.exception.code, -32002)
+                self.assertIn("no such file", str(ctx.exception.message))
+            finally:
+                client.stop()
 
 
 class ContentBlockTests(unittest.TestCase):

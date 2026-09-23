@@ -10,6 +10,7 @@ Wire shapes come from agentclientprotocol.com/protocol/v1 (read 2026-09-22).
 
 from __future__ import annotations
 
+import base64
 import logging
 import sys
 import threading
@@ -117,6 +118,26 @@ class SessionContext:
         for start in range(0, max(len(text), 1), chunk_size):
             self.check_cancelled()
             self.message(text[start : start + chunk_size], message_id)
+        return message_id
+
+    def image(self, data, mime_type: str = "image/png", message_id: str | None = None) -> str:
+        """Send one agent_message_chunk carrying an image content block.
+
+        `data` may be raw bytes (encoded here) or an already-base64 string. ACP reuses MCP's
+        ContentBlock shape, so the block is {type: "image", mimeType, data}.
+        """
+        message_id = message_id or f"msg_agent_{uuid.uuid4().hex[:8]}"
+        if isinstance(data, (bytes, bytearray)):
+            payload = base64.b64encode(bytes(data)).decode("ascii")
+        else:
+            payload = str(data)
+        self._update(
+            {
+                "sessionUpdate": "agent_message_chunk",
+                "messageId": message_id,
+                "content": {"type": "image", "mimeType": mime_type, "data": payload},
+            }
+        )
         return message_id
 
     def plan(self, entries: list[tuple[str, str]]) -> None:

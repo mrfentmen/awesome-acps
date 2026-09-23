@@ -6,21 +6,26 @@ Every agent on the official ACP list is a coding agent or a coding-agent harness
 are the other kind: agents that answer a real-world question inside Zed, JetBrains or any
 ACP client, straight from a public dataset, with no API key and nothing invented.
 
-- **25 agents** in [`agents/`](./agents)
-- **661 unit tests**, all offline, all passing
-- **24 live probes** over real ACP stdio against real public data (see [Proof](#proof))
+- **33 agents** in [`agents/`](./agents)
+- **912 unit tests**, all offline, all passing
+- **32 live probes** over real ACP stdio against real public data (see [Proof](#proof))
 
 ## The agents
 
 | Agent | What you can ask it | Dataset (keyless) |
 |---|---|---|
 | [`air`](./agents/air) | "how is the air quality in Delhi right now?", "when does it get worse today?" | Open-Meteo air quality (CAMS) |
+| [`alert`](./agents/alert) | "alert me when the air quality in Delhi passes 200", "tell me when gauge 07010000 reaches flood stage" (silent until it happens) | Open-Meteo + USGS + NWPS + Treasury |
 | [`art`](./agents/art) | "paintings by Monet", "surprise me with a piece" | Art Institute of Chicago, Cleveland, The Met |
 | [`aurora`](./agents/aurora) | "how are the geomagnetic conditions?", "odds of seeing the aurora in Tromso?" | NOAA SWPC (Kp, OVATION, alerts) |
 | [`bikes`](./agents/bikes) | "how many citibikes are available right now?", "nearest station to 40.71,-74.01?" | Citi Bike GBFS (NYC) |
 | [`books`](./agents/books) | "find books about urban foxes", "what has Ursula K. Le Guin written?" | Open Library |
+| [`brief`](./agents/brief) | "brief me on Denver" (asks, then writes `BRIEFING.md` into your workspace) | Open-Meteo + NWS + USGS + open-notify |
 | [`buoys`](./agents/buoys) | "what are the conditions at buoy 41025?", "which buoys are near Hawaii?" | NOAA NDBC realtime |
+| [`chart`](./agents/chart) | "chart the temperature in Seattle for the next 24 hours" (answers with a real PNG) | Open-Meteo + Treasury + USGS |
 | [`civic`](./agents/civic) | "did complaint 70483808 get fixed?", "complaints near 11235" | NYC Open Data |
+| [`domains`](./agents/domains) | "when does github.com expire?", "who is the registrar for example.org?" | RDAP (rdap.org) |
+| [`firehose`](./agents/firehose) | "watch the wiki firehose for 10 edits" (a push stream, not a poll) | Wikimedia EventStreams (SSE) |
 | [`floodwatch`](./agents/floodwatch) | "is the Mississippi at St. Louis flooding?", "what is gauge EADM7 doing?" | NWS NWPS gauge + USGS site search |
 | [`forecast`](./agents/forecast) | "when will it rain in Seattle today?", "what does the week look like?" | Open-Meteo forecast |
 | [`fx`](./agents/fx) | "what is 100 USD in EUR?", "how did USD-EUR move this month?" | ECB reference rates (Frankfurter) |
@@ -31,9 +36,12 @@ ACP client, straight from a public dataset, with no API key and nothing invented
 | [`ledger`](./agents/ledger) | "what is the national debt right now?", "how much interest is paid?" | US Treasury Fiscal Data |
 | [`local`](./agents/local) | "how much disk space is left?", "what is going on in this repo?", "what is on port 3000?" | this machine, read-only (`git`, `lsof`) |
 | [`nature`](./agents/nature) | "how many monarch butterflies are recorded in Canada?", "what is seen near 40.71,-74.01?" | GBIF occurrence records |
+| [`osm`](./agents/osm) | "nearest drinking water to Bryant Park, New York", "pharmacies near Miami Beach" | OpenStreetMap (Nominatim + Overpass) |
+| [`papers`](./agents/papers) | "papers about CRISPR sickle cell", "what is DOI 10.1038/nature12373?" | PubMed + arXiv + Crossref |
 | [`rivers`](./agents/rivers) | "what is gauge 06730500 doing?", "which gauges are near 40.71,-74.01?" | USGS water data (OGC API) |
 | [`species`](./agents/species) | "how many monarch butterflies are there?", "what has been seen near 40.71,-74.01?" | iNaturalist |
 | [`surf`](./agents/surf) | "how are the waves at Pipeline?", "when is it worth surfing at Nazare?" | Open-Meteo marine + wind |
+| [`tides`](./agents/tides) | "when is the next high tide in Boston?", "the tide table for Portland, Maine" | NOAA Tides and Currents |
 | [`vehicles`](./agents/vehicles) | "recalls for the 2015 Honda Civic", "complaints about a VIN" | NHTSA |
 | [`watch`](./agents/watch) | "watch the earthquakes", "watch the aurora for 4 rounds every 30s" (pushes until cancelled) | USGS quakes + NOAA Kp + open-notify |
 | [`wiki`](./agents/wiki) | "who was Ada Lovelace?", "what happened on this day?" | Wikipedia + Wikidata |
@@ -56,7 +64,7 @@ python3 tools/probe.py --agent "python3 agents/forecast/agent.py" \
 # every agent, one live question each
 python3 tools/probe_all.py
 
-# all 661 unit tests (offline, no network)
+# all 912 unit tests (offline, no network)
 bash scripts/test-all.sh
 ```
 
@@ -72,36 +80,44 @@ Wire one into Zed or JetBrains — any ACP client takes a command:
 
 ## Proof
 
-Live probe of all 25 agents over real ACP stdio on 2026-09-23 (every answer came from the
+Live probe of all 33 agents over real ACP stdio on 2026-09-23 (every answer came from the
 dataset, not a fixture). `a2a_bridge` is probed only when `ACP_A2A_ENDPOINTS` points at a
-running A2A server, so that run shows 24:
+running A2A server, so that run shows 32:
 
 ```
-[PASS] air        (0.92s) - how is the air quality in Delhi right now?             tool: air-now
-[PASS] art        (0.79s) - paintings by Monet                                    tool: art-search
-[PASS] aurora     (0.90s) - how are the geomagnetic conditions right now?         tool: aurora-now
-[PASS] bikes      (1.14s) - how many citibikes are available right now?           tool: bikes-status
-[PASS] books      (6.77s) - find books about urban foxes                          tool: books-search
-[PASS] buoys      (1.31s) - what are the conditions at buoy 41025?                tool: buoy-conditions
-[PASS] civic      (1.44s) - did complaint 70483808 get fixed?                     tool: complaint-status
-[PASS] floodwatch (1.60s) - what is the Mississippi River at St. Louis doing?      tool: flood-status
-[PASS] forecast   (0.90s) - when will it rain in Seattle today?                   tool: weather-rain
-[PASS] fx         (0.79s) - what is 100 USD in EUR?                               tool: fx-rate
-[PASS] hazards    (0.89s) - any weather alerts in NY right now?                   tool: alerts-active
-[PASS] iss        (3.48s) - could I see the ISS from Denver tonight?              tool: iss-sky
-[PASS] labels     (1.68s) - what is lipitor?                                      tool: label-info
-[PASS] launches   (1.42s) - what is the next launch?                              tool: launches-upcoming
-[PASS] ledger     (1.17s) - what is the national debt right now?                  tool: debt-outstanding
+[PASS] air        (0.93s) - how is the air quality in Delhi right now?             tool: air-now
+[PASS] alert      (1.49s) - alert me when the air quality in Delhi passes 200...    tool: alert-watch
+[PASS] art        (0.83s) - paintings by Monet                                    tool: art-search
+[PASS] aurora     (0.86s) - how are the geomagnetic conditions right now?         tool: aurora-now
+[PASS] bikes      (0.85s) - how many citibikes are available right now?           tool: bikes-status
+[PASS] books      (0.76s) - find books about urban foxes                          tool: books-search
+[PASS] brief      (2.37s) - brief me on Denver                                    tool: brief-gather
+[PASS] buoys      (1.17s) - what are the conditions at buoy 41025?                tool: buoy-conditions
+[PASS] chart      (1.39s) - chart the temperature in Seattle for the next 12 hours tool: chart-temperature
+[PASS] civic      (1.04s) - did complaint 70483808 get fixed?                     tool: complaint-status
+[PASS] domains    (0.55s) - when does example.com expire?                         tool: domain-info
+[PASS] firehose   (1.28s) - watch the wiki firehose for 2 edits                   tool: firehose-edits
+[PASS] floodwatch (2.07s) - what is the Mississippi River at St. Louis doing?      tool: flood-status
+[PASS] forecast   (0.74s) - when will it rain in Seattle today?                   tool: weather-rain
+[PASS] fx         (0.53s) - what is 100 USD in EUR?                               tool: fx-rate
+[PASS] hazards    (0.93s) - any weather alerts in NY right now?                   tool: alerts-active
+[PASS] iss        (1.08s) - could I see the ISS from Denver tonight?              tool: iss-sky
+[PASS] labels     (1.33s) - what is lipitor?                                      tool: label-info
+[PASS] launches   (0.77s) - what is the next launch?                              tool: launches-upcoming
+[PASS] ledger     (0.99s) - what is the national debt right now?                  tool: debt-outstanding
 [PASS] local      (0.40s) - what is going on in this repo?                        tool: git
-[PASS] nature     (3.74s) - how many monarch butterflies are recorded in Canada?  tool: nature-count
-[PASS] rivers     (0.96s) - what is gauge 06730500 doing right now?               tool: river-stage
-[PASS] species    (1.05s) - how many observations of Danaus plexippus are there?  tool: species-count
-[PASS] surf       (1.56s) - how are the waves at Pipeline right now?              tool: surf-now
-[PASS] vehicles   (0.75s) - recalls for the 2015 Honda Civic                      tool: vehicle-recalls
-[PASS] watch      (6.74s) - watch the aurora for 3 rounds every 3 seconds         tool: watch-aurora
-[PASS] wiki       (0.64s) - who was Ada Lovelace?                                 tool: wiki-summary
-[PASS] wildfire   (0.87s) - what wildfires are burning in California right now?   tool: wildfire-active
-== 24/24 agent(s) answered a live question  (a2a_bridge skipped: no A2A server running)
+[PASS] nature     (3.49s) - how many monarch butterflies are recorded in Canada?  tool: nature-count
+[PASS] osm        (2.97s) - nearest drinking water to Bryant Park, New York       tool: osm-near
+[PASS] papers     (1.04s) - papers about CRISPR sickle cell                      tool: papers-search
+[PASS] rivers     (0.86s) - what is gauge 06730500 doing right now?               tool: river-stage
+[PASS] species    (1.16s) - how many observations of Danaus plexippus are there?  tool: species-count
+[PASS] surf       (1.21s) - how are the waves at Pipeline right now?              tool: surf-now
+[PASS] tides      (1.01s) - when is the next high tide in Boston?                 tool: tide-next
+[PASS] vehicles   (0.47s) - recalls for the 2015 Honda Civic                      tool: vehicle-recalls
+[PASS] watch      (6.68s) - watch the aurora for 3 rounds every 3 seconds         tool: watch-aurora
+[PASS] wiki       (1.20s) - who was Ada Lovelace?                                 tool: wiki-summary
+[PASS] wildfire   (0.89s) - what wildfires are burning in California right now?   tool: wildfire-active
+== 32/32 agent(s) answered a live question  (a2a_bridge skipped: no A2A server running)
 ```
 
 A few answers verbatim from that run:
@@ -122,6 +138,14 @@ Watching the one-minute planetary K index, 3 rounds 3 s apart:
   Round 2/3 [2026-09-23T01:10:00Z] Kp 0.00 - below storm level - no change since the last round
 Watching the space station, 3 rounds 3 s apart:
   Round 2/3 station at 51.39 N, 123.31 W - moved 21 km in 3s (6.9 km/s)
+The next high tide for BOSTON, MA (8443970):
+  - right now: 8.19 ft above MLLW (the gauge read 2026-09-22 23:00 station local time)
+  - next HIGH 8.72 ft at 2026-09-23 09:39
+Drinking water near Bryant Park (40.7538, -73.9835) within 800 m:
+  - 60 m  (unnamed on OpenStreetMap) (wheelchair: yes)
+  OpenStreetMap has 11 mapped within 800 m.
+Watching the US Air Quality Index at a place - above 200. Up to 1 round(s), 5s apart (5s at most).
+  Not met after 1 check(s) in 1s (last reading 153 AQI). Nothing is still checking now.
 ```
 
 ## What every agent guarantees
@@ -182,13 +206,19 @@ for when you point one at a server of your own, or want a different cache window
 | `<AGENT>_CACHE_TTL` | every agent | seconds a read is reused, default 60-900 depending on the feed's own limits |
 | `WATCH_AGENT_ROUNDS`, `WATCH_AGENT_INTERVAL` | [`watch`](./agents/watch) | the default rounds and gap between pushed updates (3 and 15s) |
 | `LOCAL_AGENT_TIMEOUT` | [`local`](./agents/local) | seconds before a `git` or `lsof` read is given up on (10) |
+| `FIREHOSE_HTTP_TIMEOUT` | [`firehose`](./agents/firehose) | seconds to wait on the event stream before giving up (20) |
+| `BRIEF_CACHE_TTL` | [`brief`](./agents/brief) | seconds one gathered section is reused (300) |
+| `ALERT_HTTP_TIMEOUT` | [`alert`](./agents/alert) | seconds to wait on one condition check (25) |
 | `ACP_A2A_ENDPOINTS` | [`a2a_bridge`](./agents/a2a_bridge) | `name=url,...` of A2A servers to reach |
 | `ACP_BRIDGE_PUSH_PORT` | [`a2a_bridge`](./agents/a2a_bridge) | local port the A2A push webhook listens on |
 
 ## Honest limits
 
-- Read-only. No agent here writes anything anywhere. [`local`](./agents/local) can only run
-  `git` (reporting) and `lsof` (listing), never a write, a commit or a kill.
+- Nearly everything here is read-only. The one exception is [`brief`](./agents/brief): it asks
+  with `session/request_permission` and then writes a single `BRIEFING.md` through the editor's
+  own `fs/write_text_file`, so the file lands in your workspace rather than on the side. Refuse,
+  and nothing is written and the briefing is printed instead. [`local`](./agents/local) can only
+  run `git` (reporting) and `lsof` (listing), never a write, a commit or a kill.
 - Feeds have cache TTLs (1–60 minutes) so repeated questions do not hammer public APIs;
   Launch Library's free host allows 15 requests/hour, so that one caches for 15 minutes,
   and Citi Bike's status file (2,520 stations) caches for one minute.
@@ -214,6 +244,26 @@ for when you point one at a server of your own, or want a different cache window
   does not know how any particular beach faces.
 - [`buoys`](./agents/buoys) reports "not reported" when a sensor sent nothing — that is not a
   zero.
+- [`chart`](./agents/chart) draws its PNG in the standard library (no image dependency) and is
+  capped at 640x360. A series longer than the pixels allows is sampled, and the answer says
+  which points were skipped rather than drawing a picture of something else.
+- [`firehose`](./agents/firehose) is a push stream and cannot be anything else: it is capped at
+  25 events and 60 seconds per turn, and its filters never hide what they filtered — the answer
+  says "2 of 12 seen", so "no matches" is never mistaken for a quiet wiki.
+- [`alert`](./agents/alert) is silent by design. It sends nothing until the condition is met,
+  then one message; capped at 60 checks, 300s apart and 900s in total. It waits on the
+  session's own cancel event, so cancelling stops it immediately. Quake watches fire on a
+  *new* event id, not on a magnitude that was already there.
+- [`osm`](./agents/osm) reads volunteer-mapped data: an empty answer means nobody has mapped
+  it yet, not that it is not there.
+- [`domains`](./agents/domains) reports a registry 404 as "no registration found" and
+  deliberately does not call that "available" — only a registrar can promise that.
+- [`papers`](./agents/papers) says which service answered (PubMed, arXiv or Crossref): a
+  preprint is not a peer-reviewed paper, and the agent says so.
+- [`tides`](./agents/tides) returns NOAA's harmonic predictions in the station's own local
+  clock and labels them as predictions, not as a reading of the water now.
+- [`brief`](./agents/brief) gathers each section independently, so one dead source is written
+  into the file as "unavailable" instead of silently dropping the section.
 - An agent that does not know a place says so by name instead of guessing coordinates.
 
 ## License

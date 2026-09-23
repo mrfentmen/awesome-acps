@@ -1,8 +1,9 @@
 # Missing ACP agents — research log
 
 Living list of ACP agents that did **not** exist yet, what was checked and skipped and why,
-and what is still missing. Everything below was verified on **2026-09-22** against primary
-sources, not memory.
+and what is still missing. Everything below was verified against primary sources, not memory,
+on the date each section states (the first sweep on **2026-09-22**, sessions 2-4 on
+**2026-09-23**).
 
 ## What already exists
 
@@ -77,6 +78,14 @@ then built against a keyless public feed that was verified live the same day.
 | `wiki` | no encyclopedia agent | Wikipedia summary + Wikidata entities + on-this-day |
 | `wildfire` | no fire-incident agent | NIFC WFIGS current incidents |
 | `a2a_bridge` | no way to use A2A servers from an editor | consumes any A2A agent card (sibling repo) |
+| `chart` | **no agent anywhere answers with a picture** (zero image-content-block repos found) | Open-Meteo + Treasury + USGS, drawn as a real PNG in the standard library |
+| `tides` | no tide agent, and no NOAA Tides and Currents agent | `mdapi` stations (3,499) + harmonic predictions + the gauge's live reading |
+| `osm` | no points-of-interest agent; nothing reads OpenStreetMap | Nominatim for the place, Overpass for the POIs (fountains, chargers, ATMs) |
+| `domains` | no whois/RDAP agent for registration or expiry | RDAP via `rdap.org` — example.com expires 2027-08-13 |
+| `papers` | no literature agent that says which index answered | PubMed E-utilities + arXiv Atom + Crossref, all keyless |
+| `firehose` | **no ACP agent is fed by a real push channel** | Wikimedia EventStreams (SSE) — live edits, pushed per event |
+| `brief` | **no agent writes a file for a non-coding task** | five keyless feeds, then `fs/write_text_file` after permission |
+| `alert` | **no agent waits on a *condition* rather than a value** | Open-Meteo AQI/temp, USGS quakes, NWPS flood stage, Treasury debt |
 
 ## Session 2 — 2026-09-23: six more agents, and what broke on the way
 
@@ -252,6 +261,139 @@ Feed-by-feed agents are the first shelf. These are the empty ones after it:
    only NWS has an A2A server (built in the sibling repo). Each has the feeds ready.
 6. **Write-capable agents behind permission.** Notes, changelogs, TODO triage. Every agent
    here is read-only by design; ACP has `fs/write_text_file` and nothing uses it.
+7. **Agents that answer with a picture.** ACP content blocks include `image` and `audio`,
+   and the kit already negotiates `supports_images`. No agent anywhere emits one — a GitHub
+   search for `acp agent image content block` returns **zero repos**. A `chart` agent that
+   renders a plot of an open dataset into the editor would be the first of its kind.
+8. **Agents that are also servers.** `a2a_bridge` *consumes* an A2A agent card. The
+   reciprocal — a domain ACP agent that also publishes an A2A card or an MCP server, so
+   another agent can call it — does not exist.
+
+## Session 3 — 2026-09-23: shape research and a fresh feed sweep
+
+The agent list and registry were read live again: **40 agents, still every one a coding
+agent or a coding harness**. A GitHub sweep (`gh search repos`, 60+ results) found the new
+activity is all plumbing — `acp-inspector`, `codex-acp-gateway`, `acp-openai-bridge`,
+`acpferry`, `acpctl`, `acpsub`, `acp-bridge` — plus more adapters for coding agents. No
+domain agent appeared. The thesis still holds.
+
+### The unused protocol surface (proved by search, not assumed)
+
+The kit already implements the pieces below and **no agent in this repo, or anywhere else,
+uses them for a domain**:
+
+| Surface | Status in the wild |
+|---|---|
+| `session/request_permission` | only coding agents, to approve a shell command or an edit |
+| `fs/write_text_file` | only coding agents; the hits are internal notes (`acp.md`, `CLAUDE.md`), not products |
+| `image` content block | **zero repos** — nobody returns a picture over ACP |
+| `audio` content block | none found |
+| `terminal/create` | coding agents only |
+| `session/cancel` | proven here by `watch`; unused for *conditional* watching |
+
+### 47 fresh endpoints probed, 33 answered (2026-09-23)
+
+Same method as before: one keyless `urllib` GET each, 15 s timeout, declared User-Agent.
+None of these rows was in the backlog above — this is new ground.
+
+| Candidate | Feed | Probe result on the day |
+|---|---|---|
+| `tides` | `api.tidesandcurrents.noaa.gov/mdapi/.../stations.json` | 200 — **3,499 tide-prediction stations** |
+| `asteroids` | `ssd.jpl.nasa.gov/api/horizons.api` | 200 — NASA JPL Horizons ephemeris, keyless |
+| `radar` | `api.rainviewer.com/public/weather-maps.json` | 200 — live weather-radar frames |
+| `geocode` | `nominatim.openstreetmap.org/search` | 200 — address to coordinates (ODbL) |
+| `places` | `overpass-api.de/api/interpreter` | 200 — **any OSM POI**: fountains, benches, EV chargers, ATMs |
+| `airports2` | `davidmegginson.github.io/ourairports-data/airports.csv` | 200 — the full airport table |
+| `domains` | `rdap.org/domain/example.com` | 200 — registration, registrar, expiry (whois replacement) |
+| `markets` | `query1.finance.yahoo.com/v8/finance/chart/AAPL` | 200 — live quote + history, keyless |
+| `defi` | `api.llama.fi/protocols` | 200 — DeFi TVL across protocols |
+| `btc2` | `blockchain.info/ticker` | 200 — BTC in ~250 currencies |
+| `rules` | `federalregister.gov/api/v1/documents.json` | 200 — the latest federal rules |
+| `congress` | `govtrack.us/api/v2/role?current=true` | 200 — 541 sitting members |
+| `labor` | `api.bls.gov/publicAPI/v2/timeseries/data/...` | 200 — US labor statistics |
+| `eustats` | `ec.europa.eu/eurostat/.../prc_hicp_manr` | 200 — EU inflation series |
+| `preprints` | `export.arxiv.org/api/query` | 200 — arXiv metadata |
+| `papers` | `eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` | 200 — PubMed, 1,258 hits for "urban fox" |
+| `citations` | `api.crossref.org/works` | 200 — 789,000 results with DOIs |
+| `healthstats` | `ghoapi.azureedge.net/api/Indicator` | 200 — WHO global health indicators |
+| `trending` | `wikimedia.org/api/rest_v1/metrics/pageviews/top` | 200 — what the world is reading today |
+| `archive` | `archive.org/advancedsearch.php` | 200 — Internet Archive search |
+| `japanese` | `jisho.org/api/v1/search/words` | 200 — Japanese dictionary + readings |
+| `lyrics` | `api.lyrics.ovh/v1/Coldplay/Yellow` | 200 — full lyrics |
+| `radio` | `de1.api.radio-browser.info/json/stations/search` | 200 — the global radio-station directory |
+| `spaceflight` | `api.spaceflightnewsapi.net/v4/articles` | 200 — 36,157 space-news articles |
+| `satellites` | `celestrak.org/NORAD/elements/gp.php?GROUP=stations` | 200 — **live TLEs** for the whole fleet (the row above was never probed) |
+| `bluesky` | `public.api.bsky.app/xrpc/app.bsky.actor.getProfile` | 200 — keyless AT Protocol reads |
+| `fediverse` | `lemmy.world/api/v3/post/list` | 200 — Lemmy posts |
+| `weather2` | `api.met.no/weatherapi/locationforecast/2.0/compact` | 200 — MET Norway, a second source to Open-Meteo |
+| `grid` | `api.carbonintensity.org.uk/intensity` | 200 — UK grid 176 gCO2/kWh (re-confirmed, still unbuilt) |
+| `apod` | `api.nasa.gov/planetary/apod?api_key=DEMO_KEY` | 200 — the shared `DEMO_KEY` works, so APOD is usable |
+| `ip` | `ipwho.is/8.8.8.8` | 200 (re-confirmed) |
+| `images` | `commons.wikimedia.org/w/api.php` | 200 — Commons file search with direct image URLs |
+| `novelty` | `dog.ceo/api/breeds/image/random` | 200 — random photo; noted only because it is keyless |
+
+### Dead on 2026-09-23 (do not build)
+
+| Feed | What happened |
+|---|---|
+| `reddit.com/*.json` | 403 — blocked from this host |
+| `api.openalex.org` | 429 — rate-limited |
+| `api.semanticscholar.org` | 429 — rate-limited |
+| `api.coincap.io` | DNS failure |
+| `mastodon.social/api/v1/timelines/public` | 422 — needs the right instance and params |
+| `volcano.si.edu` | 403 |
+| `xeno-canto.org/api/2` | 404 — the v2 path has moved or needs a key |
+| `noaadata.apps.nsidc.org/.../geojson` | 404 |
+| `stooq.com`, `numbersapi.com`, `catalog.data.gov` | 404 — wrong paths on the day |
+| `graphql.anilist.co` | 404 without a POST body |
+| `cloudflare-dns.com/dns-query` | 400 — needs `Accept: application/dns-json` |
+| `api.tidesandcurrents.noaa.gov/api/prod/datagetter` | 400 — parameter error; the `mdapi` stations endpoint is the way in |
+
+## Session 4 — 2026-09-23: the unused protocol surface, now used (eight agents)
+
+Session 3 proved by search that four ACP surfaces existed with no domain use. This session
+built the agents that use them, so the gaps in that table are now closed by working code:
+
+| Surface that had no domain use | Agent that now uses it |
+|---|---|
+| `image` content block (**zero repos**) | `chart` — every answer carries a 640x360 PNG, drawn with `zlib` and `struct` alone |
+| `fs/write_text_file` with `session/request_permission` | `brief` — asks, then writes `BRIEFING.md` into the workspace the editor opened |
+| a push channel, not a poll | `firehose` — Wikimedia SSE, one `session/update` per event |
+| `session/cancel` for a *conditional* watch | `alert` — silent until the condition holds; cancel breaks the wait, not the sleep after it |
+| `embeddedContext` / `resource_link` text | already handled by the kit; still unused by any agent |
+| `audio` content block | still unused; no keyless audio feed worth streaming was found |
+
+Feeds that answered cleanly and are now built: NOAA tide stations, Nominatim + Overpass,
+RDAP, PubMed/arXiv/Crossref, Wikimedia EventStreams, Treasury debt, NWS NWPS flood stage.
+
+### What the live data changed in the design
+
+- **Open-Meteo's flood API is not a river.** It reported 0.45 m3/s for the Mississippi at
+  St. Louis (the real river is thousands). Dropped it for `floodwatch` and `alert`; NWS NWPS
+  gauges are the real thing.
+- **USGS site search is case-sensitive.** `LIKE '%Willamette River%'` returns zero rows
+  because USGS stores `WILLAMETTE RIVER AT SALEM`. Both sides are lower-cased now.
+- **GBIF cannot map common names** ("tiger" ranked a clam above *Panthera tigris*). `nature`
+  resolves through iNaturalist first. The same lesson made `tides` reject its own first
+  scorer, which had picked "Battery Creek, SC" over "NEW YORK (The Battery)".
+- **NOAA defaults `begin_date` to three days ago**, so a naive tide request returns stale
+  predictions that look current.
+- **`tideType` is empty for all 3,499 stations**, so any reference/subordinate label would
+  have been invented. Removed, and the answer reports high versus low instead.
+- **arXiv answers HTTP 406 to a burst** and ignores every `sortBy` except `submittedDate`;
+  accepted as a real limit, with one retry and a specific message.
+- **NWS rejects `limit` together with `point`** (HTTP 400), so the first alerts in the
+  payload are used rather than asking for a page size.
+- **arXiv itself has no flood-river search**, and NWPS's gauge list is ~13 MB (about 50 s),
+  so a river name is resolved through USGS and only the gauge id is sent to NWPS.
+
+### Known bug in older agents, deliberately not touched this session
+
+Seven agents — `air`, `bikes`, `forecast`, `hazards`, `iss`, `rivers`, `species` — parse
+coordinates with `\b(-?\d{1,2}...)`. The `\b` blocks the minus sign, so `-33.87,151.21`
+(Sydney) is read as `33.87,151.21`: the wrong hemisphere, silently. 13 files are affected
+and no test covers it. `surf`, built later, uses the correct pattern. Fixing the seven is a
+separate, testable change and is not done here.
 
 ## Skipped — already a thing
 

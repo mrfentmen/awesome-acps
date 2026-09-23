@@ -9,6 +9,11 @@
 
 It answers session/request_permission according to `permission`, records every
 session/update notification it receives and every permission request it was asked.
+
+Pass `fs_root` and it also serves fs/read_text_file and fs/write_text_file, sandboxed to that
+directory, recording every read and write. Without `fs_root` it advertises no filesystem
+capability at all, so an agent that checks the capability (as the spec requires) is told the
+truth instead of being told yes and then failing.
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ import logging
 import shutil
 import subprocess
 import threading
+from pathlib import Path
 
 from .rpc import Connection, JsonRpcError
 
@@ -32,7 +38,8 @@ PERMISSION_OPTIONS = {
 
 class AcpClient:
     def __init__(self, command: list[str] | None = None, connection: Connection | None = None,
-                 permission: str = "allow-once", timeout: float = 60.0, stderr=None) -> None:
+                 permission: str = "allow-once", timeout: float = 60.0, stderr=None,
+                 fs_root: str | None = None) -> None:
         self.command = command
         self.permission = PERMISSION_OPTIONS.get(permission, "allow-once")
         self.timeout = timeout
@@ -41,6 +48,10 @@ class AcpClient:
         self.updates: list[dict] = []
         self.permission_requests: list[dict] = []
         self.notifications: list[str] = []
+        #: The one directory this client will read or write for an agent, if any.
+        self.fs_root = Path(fs_root).resolve() if fs_root else None
+        self.written_files: list[dict] = []
+        self.read_files: list[dict] = []
         self._thread: threading.Thread | None = None
         self._stderr = stderr
         if connection is not None:
@@ -106,20 +117,64 @@ class AcpClient:
             self.updates.append(params.get("update") or {})
 
     def _on_request(self, method: str, params: dict, request_id):
+        if method == "fs/write_text_file":
+            return self._write_text_file(params)
+        if method == "fs/read_text_file":
+            return self._read_text_file(params)
         if method != "session/request_permission":
             raise JsonRpcError(-32601, f"client does not implement {method}")
         self.permission_requests.append(params)
         return {"outcome": {"outcome": "selected", "optionId": self.permission}}
 
+    # -- filesystem (only when fs_root was given) --------------------------
+
+    def _local_path(self, raw) -> Path:
+        """Resolve an agent's path inside fs_root, refusing anything that escapes it."""
+        if self.fs_root is None:
+            raise JsonRpcError(-32601, "this client has no fs_root, so it implements no fs methods")
+        candidate = Path(str(raw or ""))
+        path = candidate.resolve() if candidate.is_absolute() else (self.fs_root / candidate).resolve()
+        if path != self.fs_root and self.fs_root not in path.parents:
+            raise JsonRpcError(-32602, f"path is outside this client's fs_root: {raw}")
+        return path
+
+    def _write_text_file(self, params: dict) -> dict:
+        path = self._local_path(params.get("path"))
+        content = params.get("content")
+        if not isinstance(content, str):
+            raise JsonRpcError(-32602, "fs/write_text_file needs a string content")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        self.written_files.append({"path": str(path), "content": content})
+        return {}
+
+    def _read_text_file(self, params: dict) -> dict:
+        path = self._local_path(params.get("path"))
+        if not path.is_file():
+            raise JsonRpcError(-32002, f"no such file: {path}")
+        text = path.read_text(encoding="utf-8", errors="replace")
+        line, limit = params.get("line"), params.get("limit")
+        if isinstance(line, int) and line > 1:
+            text = "".join(text.splitlines(keepends=True)[line - 1:])
+        if isinstance(limit, int) and limit > 0:
+            text = "".join(text.splitlines(keepends=True)[:limit])
+        self.read_files.append({"path": str(path), "bytes": len(text)})
+        return {"content": text}
+
     # -- protocol calls ----------------------------------------------------
 
     def initialize(self, name: str = "acp-client", version: str = "1.0.0",
                    capabilities: dict | None = None, protocol_version: int = 1) -> dict:
+        if capabilities is None:
+            # Advertise only what this client can actually serve: an agent is required to
+            # check these flags before calling fs/read_text_file or fs/write_text_file.
+            capable = self.fs_root is not None
+            capabilities = {"fs": {"readTextFile": capable, "writeTextFile": capable}}
         self.initialized_payload = self.conn.request(
             "initialize",
             {
                 "protocolVersion": protocol_version,
-                "clientCapabilities": capabilities if capabilities is not None else {"fs": {"readTextFile": True, "writeTextFile": True}},
+                "clientCapabilities": capabilities,
                 "clientInfo": {"name": name, "title": name, "version": version},
             },
             timeout=self.timeout,
