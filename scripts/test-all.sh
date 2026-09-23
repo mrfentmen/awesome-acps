@@ -12,7 +12,7 @@ failed_files=0
 "$python" tools/check_syntax.py || exit 1
 echo
 
-for file in tests/test_kit.py agents/*/tests/test_agent.py; do
+for file in tests/test_*.py agents/*/tests/test_agent.py; do
   output="$("$python" "$file" 2>&1)"
   ran="$(printf '%s\n' "$output" | grep -oE '^Ran [0-9]+' | grep -oE '[0-9]+')"
   if printf '%s\n' "$output" | grep -q '^OK'; then
@@ -26,7 +26,7 @@ for file in tests/test_kit.py agents/*/tests/test_agent.py; do
 done
 
 echo
-echo "== $total tests in $(( $(ls -d agents/*/ | wc -l | tr -d ' ') + 1 )) files"
+echo "== $total tests in $(( $(ls -d agents/*/ | wc -l | tr -d ' ') + $(ls tests/test_*.py | wc -l | tr -d ' ') )) files"
 if [ "$failed_files" -gt 0 ]; then
   echo "== $failed_files file(s) failed"
   exit 1

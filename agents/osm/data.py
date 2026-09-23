@@ -6,8 +6,9 @@ Two keyless services, both verified live on 2026-09-23:
   overpass-api.de/api/interpreter      what is mapped near a point (Postel's own query API)
 
 Nominatim has one rule this reader respects: it wants a real User-Agent identifying the
-caller, so this agent sends one and caches results. Overpass occasionally returns 429/504
-under load, so there is one fallback mirror (kumi.systems) and a clear error after that.
+caller, so this agent sends one and caches results. Overpass returns 429/504 and read
+timeouts under load, so there are two fallback mirrors (kumi.systems and the QuickOSM
+list's maps.mail.ru) and a clear error that names all three after that.
 
 Nothing here invents a place. If OSM has no matching POI, the answer says so - OpenStreetMap
 is volunteer-mapped, and an empty result means "no mapper has added it", not "it is not there".
@@ -27,9 +28,12 @@ from urllib import parse, request
 NOMINATIM = "https://nominatim.openstreetmap.org"
 DATASET = "OpenStreetMap (nominatim.openstreetmap.org and overpass-api.de)"
 
-#: Overpass asks callers to identify themselves and to use the nearest of its mirrors.
+#: Overpass mirrors, tried in order (the mailing-list and QuickOSM sets agree on the first
+#: two). Both main hosts returned a 504 or a read timeout on 2026-09-23 while the third
+#: answered in 22s, so the third one stays in the list.
 OVERPASS_MIRRORS = ("https://overpass-api.de/api/interpreter",
-                    "https://overpass.kumi.systems/api/interpreter")
+                    "https://overpass.kumi.systems/api/interpreter",
+                    "https://maps.mail.ru/osm/tools/overpass/api/interpreter")
 
 DEFAULT_USER_AGENT = "awesome-acps-osm/1.0 (+https://github.com/mrfentmen/awesome-acps)"
 
@@ -232,7 +236,8 @@ class OsmData:
                 last_error = exc
                 payload = None
         if payload is None:
-            raise OsmError(f"Overpass did not answer on either mirror: {last_error}")
+            raise OsmError(f"Overpass did not answer on any of its {len(OVERPASS_MIRRORS)} "
+                           f"mirrors: {last_error}")
         if not isinstance(payload, dict) or "elements" not in payload:
             raise OsmError("Overpass returned an unexpected payload")
 

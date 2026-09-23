@@ -34,6 +34,7 @@ from data import (  # noqa: E402
     MAX_RADIUS_M,
     OsmData,
     OsmError,
+    OVERPASS_MIRRORS,
     haversine_km,
     kinds_from_text,
     radius_from_text,
@@ -182,10 +183,18 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(result["total"], 3)
         self.assertEqual(len(feed.overpass_queries()), 2)
 
-    def test_both_mirrors_down_is_one_error(self):
-        data, _ = make_data(fail_mirrors=("overpass-api.de", "kumi"))
-        with self.assertRaises(OsmError):
+    def test_the_last_mirror_is_tried_when_the_others_are_busy(self):
+        data, feed = make_data(fail_mirrors=OVERPASS_MIRRORS[:-1])
+        result = data.pois(40.7538, -73.9835, "amenity", "drinking_water", 800)
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(len(feed.overpass_queries()), len(OVERPASS_MIRRORS))
+
+    def test_every_mirror_down_is_one_error(self):
+        data, feed = make_data(fail_mirrors=OVERPASS_MIRRORS)
+        with self.assertRaises(OsmError) as caught:
             data.pois(40.7538, -73.9835, "amenity", "drinking_water", 800)
+        self.assertEqual(len(feed.overpass_queries()), len(OVERPASS_MIRRORS))
+        self.assertIn(f"any of its {len(OVERPASS_MIRRORS)} mirrors", str(caught.exception))
 
     def test_an_empty_place_payload_is_an_error_not_a_guess(self):
         data, _ = make_data(overpass={"unexpected": True})
@@ -317,7 +326,7 @@ class TurnTests(unittest.TestCase):
 
     def test_a_dead_service_is_reported(self):
         result, _, _ = self.turn("nearest drinking water to Bryant Park",
-                                 fail_mirrors=("overpass-api.de", "kumi"))
+                                 fail_mirrors=OVERPASS_MIRRORS)
         self.assertIn("could not read OpenStreetMap", result["text"])
 
 

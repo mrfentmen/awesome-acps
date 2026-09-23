@@ -86,11 +86,19 @@ USGS = {"type": "FeatureCollection", "features": [
 ]}
 
 
-def usgs_with_events(offsets_minutes):
-    now = datetime.datetime.now(datetime.timezone.utc)
+def usgs_with_events(hours_ago=(0, 1, 2)):
+    """One event inside each of the named hour buckets, counted back from the current hour.
+
+    Anchored to the start of an hour, like the rest of this file, rather than to "now minus N
+    minutes": at five minutes past an hour an event "5 minutes ago" lands in the *previous*
+    bucket, so the newest bar was empty and this file failed for five minutes of every hour
+    (caught by the suite at 08:02 UTC on 2026-09-23, green again at 08:06).
+    """
+    hour_start = datetime.datetime.now(datetime.timezone.utc).replace(minute=0, second=0,
+                                                                     microsecond=0)
     features = []
-    for minutes in offsets_minutes:
-        stamp = now - datetime.timedelta(minutes=minutes)
+    for hours in hours_ago:
+        stamp = hour_start - datetime.timedelta(hours=hours)
         features.append({"properties": {"mag": 3.0, "time": stamp.timestamp() * 1000,
                                         "place": "test"}})
     return {"type": "FeatureCollection", "features": features}
@@ -107,7 +115,7 @@ class FakeFeed:
         self.aqi = aqi
         self.temperature = temperature
         self.rain = rain
-        self.quakes = quakes if quakes is not None else usgs_with_events([5, 70, 130])
+        self.quakes = quakes if quakes is not None else usgs_with_events()
         self.treasury = treasury if treasury is not None else TREASURY
         self.place = place
 
@@ -297,7 +305,10 @@ class SeriesTests(unittest.TestCase):
         self.assertEqual(series["labels"], ["09-17", "09-18", "09-21"])
 
     def test_quakes_are_counted_per_hour_and_ignore_events_without_a_time(self):
-        data, _ = make_data(quakes=usgs_with_events([5, 70, 130]))
+        payload = usgs_with_events([0, 1, 2])
+        payload["features"].append({"properties": {"mag": 3.0, "time": None,
+                                                    "place": "test"}})
+        data, _ = make_data(quakes=payload)
         series = data.series("quakes", hours=6)
         self.assertEqual(series["chart"], "bar")
         self.assertEqual(len(series["values"]), 6)

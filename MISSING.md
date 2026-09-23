@@ -86,6 +86,18 @@ then built against a keyless public feed that was verified live the same day.
 | `firehose` | **no ACP agent is fed by a real push channel** | Wikimedia EventStreams (SSE) — live edits, pushed per event |
 | `brief` | **no agent writes a file for a non-coding task** | five keyless feeds, then `fs/write_text_file` after permission |
 | `alert` | **no agent waits on a *condition* rather than a value** | Open-Meteo AQI/temp, USGS quakes, NWPS flood stage, Treasury debt |
+| `pollen` | no allergy/pollen agent (air quality is not pollen) | Open-Meteo air quality, 5 pollen species |
+| `moon` | no moon-phase or dark-sky agent | USNO phases + sunrise-sunset.org |
+| `crypto` | no cryptocurrency or DeFi agent | CoinGecko + DefiLlama |
+| `stocks` | no equity-quote agent (RIP `finance`) | Yahoo Finance chart endpoint |
+| `trending` | no "what is the world reading" agent (Wikipedia summaries are not traffic) | Wikimedia pageviews API |
+| `archive` | no archive/library agent | Internet Archive search + item metadata |
+| `food` | no food-label-by-product agent (drug labels are not food) | Open Food Facts |
+| `chem` | no chemistry or generic-name agent | PubChem PUG-REST + RxNorm |
+| `drought` | no drought-monitor agent | US Drought Monitor (CSV, state/county) |
+| `groundwater` | no groundwater-observation agent | USGS Water Data OGC, observation wells |
+| `snowpack` | no snow/water-supply agent | NRCS AWDB (SNOTEL) |
+| `tsunami` | no tsunami-bulletin agent, and none that reports an expired bulletin | tsunami.gov CAP (NTWC + PTWC) |
 
 ## Session 2 — 2026-09-23: six more agents, and what broke on the way
 
@@ -125,7 +137,8 @@ path at all.
 ## The gap map — candidate feeds, all probed live on 2026-09-22
 
 One `urllib` GET per endpoint, no key, 12 s timeout. 77 endpoints were probed; the ones
-that answered are below, grouped by the agent they suggest. Nothing here is built yet.
+that answered are below, grouped by the agent they suggest. Rows marked **built** became
+agents in a later session; the rest are still unbuilt.
 
 ### Nature, ocean, sky
 
@@ -137,7 +150,7 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 | `floodwatch` | `flood-api.open-meteo.com/v1/flood` | 200, **but useless**: see "the flood API was the wrong river" below |
 | `radiation` | `api.safecast.org/measurements.json` | 200 — 52.0 cpm at the latest volunteer sensor |
 | `stargazing` | `7timer.info/bin/api.pl?product=astro` | 200 — cloudcover 9, seeing 7, transparency 3 for the next nights |
-| `almanac` | `api.sunrise-sunset.org/json` | 200 — sunset 2026-09-22T22:54:52Z for New York |
+| `almanac` | `api.sunrise-sunset.org/json` | 200 — sunset 2026-09-22T22:54:52Z for New York — **built** into `moon` |
 
 ### Space
 
@@ -163,7 +176,7 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 | Candidate | Feed | Probe result on the day |
 |---|---|---|
 | `bitcoin` | `mempool.space/api/v1/fees/recommended` | 200 — fastestFee 6 sat/vB, plus blocks and tx lookup |
-| `crypto` | `api.coingecko.com/api/v3/simple/price` | 200 — BTC $86,239 |
+| `crypto` | `api.coingecko.com/api/v3/simple/price` | 200 — BTC $86,239 — **built** (with DefiLlama below) |
 | `crypto2` | `api.coinbase.com/v2/exchange-rates` | 200 — BTC in ~250 currencies |
 | `companies` | `api.gleif.org/api/v1/lei-records` | 200 — 370 LEI records matched "Apple" (legal entity identity) |
 | `development` | `api.worldbank.org/v2/country/US/indicator/...` | 200 — GDP and 16k other series |
@@ -175,7 +188,7 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 | Candidate | Feed | Probe result on the day |
 |---|---|---|
 | `trials` | `clinicaltrials.gov/api/v2/studies` | 200 — melanoma trials, structured protocol |
-| `drugnames` | `rxnav.nlm.nih.gov/REST/drugs.json` | 200 — "lipitor" → atorvastatin 80 MG |
+| `drugnames` | `rxnav.nlm.nih.gov/REST/drugs.json` | 200 — "lipitor" → atorvastatin 80 MG — **built** into `chem` |
 | `dailymed` | `dailymed.nlm.nih.gov/.../spls.json` | 200 — LIPITOR SPL (a second label source to `labels`) |
 | `disease` | `disease.sh/v3/covid-19/all` | 200 — global case stats |
 | `cves` | `api.first.org/data/v1/epss` | 200 — EPSS exploit probability for a CVE |
@@ -190,7 +203,7 @@ that answered are below, grouped by the agent they suggest. Nothing here is buil
 | `music2` | `itunes.apple.com/search` | 200 — albums/podcasts, artwork |
 | `recipes` | `themealdb.com/api/json/v1/1/search.php` | 200 — Chicken Handi |
 | `drinks` | `thecocktaildb.com/api/json/v1/1/search.php` | 200 — Margarita |
-| `nutrition` | `world.openfoodfacts.org/api/v2/product/...` | 200 — 3M+ products, allergens + Nutri-Score |
+| `nutrition` | `world.openfoodfacts.org/api/v2/product/...` | 200 — 3M+ products, allergens + Nutri-Score — **built** as `food` |
 | `poetry` | `poetrydb.org/author/Emily%20Dickinson` | 200 — full poems |
 | `comics` | `xkcd.com/info.0.json` | 200 — latest comic #3301 |
 | `mtg` | `api.scryfall.com/cards/named` | 200 — Lightning Bolt, oracle text + prices |
@@ -305,8 +318,8 @@ None of these rows was in the backlog above — this is new ground.
 | `places` | `overpass-api.de/api/interpreter` | 200 — **any OSM POI**: fountains, benches, EV chargers, ATMs |
 | `airports2` | `davidmegginson.github.io/ourairports-data/airports.csv` | 200 — the full airport table |
 | `domains` | `rdap.org/domain/example.com` | 200 — registration, registrar, expiry (whois replacement) |
-| `markets` | `query1.finance.yahoo.com/v8/finance/chart/AAPL` | 200 — live quote + history, keyless |
-| `defi` | `api.llama.fi/protocols` | 200 — DeFi TVL across protocols |
+| `markets` | `query1.finance.yahoo.com/v8/finance/chart/AAPL` | 200 — live quote + history, keyless — **built** as `stocks` |
+| `defi` | `api.llama.fi/protocols` | 200 — DeFi TVL across protocols — **built** into `crypto` |
 | `btc2` | `blockchain.info/ticker` | 200 — BTC in ~250 currencies |
 | `rules` | `federalregister.gov/api/v1/documents.json` | 200 — the latest federal rules |
 | `congress` | `govtrack.us/api/v2/role?current=true` | 200 — 541 sitting members |
@@ -316,8 +329,8 @@ None of these rows was in the backlog above — this is new ground.
 | `papers` | `eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` | 200 — PubMed, 1,258 hits for "urban fox" |
 | `citations` | `api.crossref.org/works` | 200 — 789,000 results with DOIs |
 | `healthstats` | `ghoapi.azureedge.net/api/Indicator` | 200 — WHO global health indicators |
-| `trending` | `wikimedia.org/api/rest_v1/metrics/pageviews/top` | 200 — what the world is reading today |
-| `archive` | `archive.org/advancedsearch.php` | 200 — Internet Archive search |
+| `trending` | `wikimedia.org/api/rest_v1/metrics/pageviews/top` | 200 — what the world is reading today — **built** |
+| `archive` | `archive.org/advancedsearch.php` | 200 — Internet Archive search — **built** |
 | `japanese` | `jisho.org/api/v1/search/words` | 200 — Japanese dictionary + readings |
 | `lyrics` | `api.lyrics.ovh/v1/Coldplay/Yellow` | 200 — full lyrics |
 | `radio` | `de1.api.radio-browser.info/json/stations/search` | 200 — the global radio-station directory |
@@ -394,6 +407,72 @@ coordinates with `\b(-?\d{1,2}...)`. The `\b` blocks the minus sign, so `-33.87,
 (Sydney) is read as `33.87,151.21`: the wrong hemisphere, silently. 13 files are affected
 and no test covers it. `surf`, built later, uses the correct pattern. Fixing the seven is a
 separate, testable change and is not done here.
+
+## Session 5 — 2026-09-23: twelve more feeds, all probed live (twelve agents)
+
+Session 4's research probed 95 feeds and 71 answered. This session built the twelve that
+were most useful and cheapest, then ran the whole repo against live data. 33 → 45 agents,
+1189 tests, 44/44 live probes.
+
+| Agent | Ask it | Feed that answered (probed 2026-09-23) |
+|---|---|---|
+| `pollen` | "how bad is the pollen today in Denver?" | Open-Meteo air quality, 5 species |
+| `moon` | "next full moon?", "when does it get dark in Denver?" | USNO phases + sunrise-sunset.org |
+| `crypto` | "price of bitcoin?", "how much is locked in DeFi?" | CoinGecko + DefiLlama |
+| `stocks` | "what is AAPL doing right now?" | Yahoo Finance chart |
+| `trending` | "what is trending on Wikipedia today?" | Wikimedia pageviews |
+| `archive` | "find Apollo 11 recordings" | Internet Archive advancedsearch + metadata |
+| `food` | "how much sugar is in Nutella?" | Open Food Facts (search v2 + product v2) |
+| `chem` | "formula for ibuprofen?", "Lipitor's generic name?" | PubChem + RxNorm |
+| `drought` | "how dry is California?" | US Drought Monitor (CSV) |
+| `groundwater` | "how deep is the water table in Kansas?" | USGS Water Data OGC |
+| `snowpack` | "how much water is in the Sierra snow?" | NRCS AWDB (SNOTEL) |
+| `tsunami` | "is there a tsunami warning right now?" | tsunami.gov CAP (NTWC + PTWC) |
+
+### What the live data changed in the design
+
+- **Open Food Facts' legacy search endpoint is down.** `cgi/search.pl` no longer answers, so
+  `food` searches through the newer search-a-licious host and reads nutrients from the product
+  endpoint. Two round trips, not one.
+- **Crowd-sourced numbers can be wrong.** One Oreo entry in Open Food Facts claims 49 kcal per
+  100 g. The agent now rounds values, names the barcode it used, and says the catalogue is
+  volunteer-filled rather than presenting a number as measured.
+- **The Drought Monitor is CSV, not JSON** (the JSON view is a separate, rate-limited service),
+  and it has no national endpoint — so the agent answers a state or a county and refuses to
+  average states into one invented number.
+- **Snowpack's off-season median is zero**, which makes "percent of normal" 0 divided by 0. The
+  answer says that instead of printing 0%.
+- **USGS groundwater is depth below land surface**, so a bigger number is a deeper water table
+  and a negative one is water above the ground. A state figure is the newest reading per well
+  with the spread, because a water table is not one number.
+- **tsunami.gov leaves expired bulletins on the web**, so every answer compares the CAP expiry
+  against now and reports how long ago the last one lapsed. That is what lets it say "no".
+- **Wikimedia pageviews lag a day**, so `trending` never calls anything "today"; it also counts
+  the navigation titles (main page, search) it drops.
+- **A probe can pass on nothing.** `stocks` answered with its own help text and the probe counted
+  it as a pass. The probe now compares the answer with the agent's help text and fails a "hollow
+  pass". The `stocks` symbol parser was then fixed to read "what is AAPL doing".
+- **A probe can pass on an outage.** Two runs in a row had `osm` answer "Overpass did not answer
+  on either mirror" and still print `[PASS]`. The probe now flags any answer containing
+  `I could not read ...` as `upstream down for <agent>`: a pass, named as one that proves the
+  outage is handled rather than the dataset. Probing the mirrors directly showed the real
+  trouble: `overpass-api.de` 504, `kumi.systems` read timeout, and a third mirror from
+  QuickOSM's list answering in 22s - so `osm` now tries three mirrors, and the next run
+  answered in 1.48s.
+- **A test that fails for five minutes of every hour.** `chart`'s quake fixture built events at
+  "now minus 5, 70, 130 minutes", so between :00 and :05 the newest event fell into the
+  *previous* hour bucket and the suite failed (seen at 08:02 UTC, green at 08:06). Simulating
+  all 3,600 second-offsets of an hour showed the old fixture breaking 300 of them and the
+  hour-anchored one breaking none. The same test now also covers what its name claims: an event
+  with no timestamp is ignored, not counted.
+
+### Still open from session 4's list
+
+`flights`, `airport`, `clinicaltrials`, `company`, `solar`, `lobbying`, `nonprofit`, `votes`,
+`recalls`, `music`, `podcast`, `radio`, `asteroids`, `sports` and the new *shapes* (`attach`,
+`apod`, `gallery`, `memory`, `orchestrator`, `a2a-out`) are researched and unbuilt. `attach`
+is the one that matters: the kit handles `embeddedContext` and no agent anywhere reads an
+attached file.
 
 ## Skipped — already a thing
 
