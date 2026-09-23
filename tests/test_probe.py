@@ -58,12 +58,20 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(classify(answer, "what is burning in California?"), (False, False))
 
     def test_every_probed_agent_has_a_real_question(self):
-        for name, (script, prompt) in AGENTS.items():
+        for name, entry in AGENTS.items():
+            script, prompt = entry[0], entry[1]
             with self.subTest(agent=name):
                 self.assertTrue((REPO_ROOT / script).is_file(), f"{script} is missing")
                 self.assertTrue(prompt.strip(), f"{name} has no probe question")
                 self.assertFalse(classify(prompt, prompt)[0],
                                  f"{name}'s probe question is itself a help request")
+
+    def test_a_probe_that_attaches_blocks_attaches_resource_blocks(self):
+        # attach answers about the file it is handed, so its probe entry carries one.
+        entry = AGENTS["attach"]
+        self.assertEqual(len(entry), 3)
+        self.assertTrue(all(block.get("type") == "resource" for block in entry[2]))
+        self.assertTrue(entry[2][0]["resource"].get("text"))
 
 
 if __name__ == "__main__":

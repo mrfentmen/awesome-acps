@@ -29,25 +29,39 @@ if str(REPO_ROOT) not in sys.path:
 from acp_kit import AcpClient  # noqa: E402  (path setup must come first)
 
 #: agent name -> (agent script, one live question). Every question reads a real feed.
-AGENTS: dict[str, tuple[str, str]] = {
+#: name -> (script, question[, extra prompt blocks]). An agent that answers about something the
+#: client hands it (attach) needs those blocks, so the table carries them.
+AGENTS: dict[str, tuple] = {
     "a2a_bridge": ("agents/a2a_bridge/bridge.py", "which agents can you reach?"),
     "air": ("agents/air/agent.py", "how is the air quality in Delhi right now?"),
     "alert": ("agents/alert/agent.py", "alert me when the air quality in Delhi passes 200 "
                                         "for 1 check every 5 seconds"),
+    "apod": ("agents/apod/agent.py", "show me NASA's picture of the day"),
     "archive": ("agents/archive/agent.py", "find Apollo 11 recordings"),
     "art": ("agents/art/agent.py", "paintings by Monet"),
+    # attach answers about the file it is given, so the probe gives it one - the same
+    # `resource` block a real client puts in the prompt.
+    "attach": ("agents/attach/agent.py", "what is in this file?", [
+        {"type": "resource", "resource": {
+            "uri": "file:///tmp/probe_cities.csv", "mimeType": "text/csv",
+            "text": "name,city,pop\nspringfield,IL,114394\nportland,ME,68408\n"}},
+    ]),
     "aurora": ("agents/aurora/agent.py", "how are the geomagnetic conditions right now?"),
     "bikes": ("agents/bikes/agent.py", "how many citibikes are available right now?"),
     "books": ("agents/books/agent.py", "find books about urban foxes"),
     "brief": ("agents/brief/agent.py", "brief me on Denver"),
     "buoys": ("agents/buoys/agent.py", "what are the conditions at buoy 41025?"),
     "chart": ("agents/chart/agent.py", "chart the temperature in Seattle for the next 12 hours"),
+    "clinicaltrials": ("agents/clinicaltrials/agent.py", "trials for melanoma in Boston"),
+    "company": ("agents/company/agent.py", "Microsoft's last 10-K"),
     "chem": ("agents/chem/agent.py", "what is the formula for ibuprofen?"),
     "civic": ("agents/civic/agent.py", "did complaint 70483808 get fixed?"),
     "crypto": ("agents/crypto/agent.py", "what is the price of bitcoin right now?"),
     "domains": ("agents/domains/agent.py", "when does example.com expire?"),
     "drought": ("agents/drought/agent.py", "how dry is California?"),
     "firehose": ("agents/firehose/agent.py", "watch the wiki firehose for 2 edits"),
+    "flights": ("agents/flights/agent.py", "what planes are over Bryant Park, New York right "
+                                              "now?"),
     "floodwatch": ("agents/floodwatch/agent.py", "what is the Mississippi River at St. Louis doing?"),
     "food": ("agents/food/agent.py", "how much sugar is in Nutella?"),
     "forecast": ("agents/forecast/agent.py", "when will it rain in Seattle today?"),
@@ -102,7 +116,8 @@ def classify(text: str, prompt: str) -> tuple[bool, bool]:
     return hollow, UPSTREAM_MARKER in text
 
 
-def probe(name: str, script: str, prompt: str, timeout: float, show_log: bool) -> dict:
+def probe(name: str, script: str, prompt: str, timeout: float, show_log: bool,
+          extra: list[dict] | None = None) -> dict:
     started = time.time()
     client = AcpClient(command=[sys.executable, str(REPO_ROOT / script)], permission="allow-once",
                        timeout=timeout, stderr=None if show_log else sys.stderr)
@@ -114,7 +129,8 @@ def probe(name: str, script: str, prompt: str, timeout: float, show_log: bool) -
         agent_info = info.get("agentInfo") or {}
         report["title"] = agent_info.get("title") or agent_info.get("name")
         session_id = client.new_session(cwd=os.getcwd())
-        turn = client.prompt(prompt, session_id)
+        blocks = [{"type": "text", "text": prompt}] + list(extra or [])
+        turn = client.prompt(prompt, session_id, blocks=blocks)
         for update in turn["updates"]:
             if update.get("sessionUpdate") == "tool_call" and not report["tool"]:
                 report["tool"] = f"{update.get('name')} ({update.get('status')})"
@@ -148,14 +164,13 @@ def main(argv=None) -> int:
     endpoints = os.environ.get("ACP_A2A_ENDPOINTS", "").strip()
     reports = []
     for name in wanted:
-        if name == "a2a_bridge":
-            if endpoints:
-                reports.append(probe(name, *AGENTS[name], args.timeout, args.show_server_log))
-            else:
-                print("skipping a2a_bridge: set ACP_A2A_ENDPOINTS to a running A2A server "
-                      "(for example nyc311=http://127.0.0.1:8787)\n", file=sys.stderr)
+        if name == "a2a_bridge" and not endpoints:
+            print("skipping a2a_bridge: set ACP_A2A_ENDPOINTS to a running A2A server "
+                  "(for example nyc311=http://127.0.0.1:8787)\n", file=sys.stderr)
             continue
-        reports.append(probe(name, *AGENTS[name], args.timeout, args.show_server_log))
+        script, question, *rest = AGENTS[name]
+        reports.append(probe(name, script, question, args.timeout, args.show_server_log,
+                             extra=rest[0] if rest else None))
 
     if args.json:
         print(json.dumps(reports, indent=2))

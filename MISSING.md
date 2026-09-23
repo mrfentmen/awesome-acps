@@ -468,11 +468,79 @@ were most useful and cheapest, then ran the whole repo against live data. 33 →
 
 ### Still open from session 4's list
 
-`flights`, `airport`, `clinicaltrials`, `company`, `solar`, `lobbying`, `nonprofit`, `votes`,
-`recalls`, `music`, `podcast`, `radio`, `asteroids`, `sports` and the new *shapes* (`attach`,
-`apod`, `gallery`, `memory`, `orchestrator`, `a2a-out`) are researched and unbuilt. `attach`
-is the one that matters: the kit handles `embeddedContext` and no agent anywhere reads an
-attached file.
+`airport`, `solar`, `lobbying`, `nonprofit`, `votes`, `recalls`, `music`, `podcast`, `radio`,
+`asteroids`, `sports` and the new *shapes* (`gallery`, `memory`, `orchestrator`, `a2a-out`) are
+researched and unbuilt. Session 6 built `attach`, `apod`, `flights`, `company` and
+`clinicaltrials`, which were the five top picks of that list.
+
+## Session 6 — 2026-09-23: the five top picks, and what live data changed in them
+
+Session 4's research picked five of its own list as the most useful: `flights` (live aircraft),
+`company` (real filings), `attach` (the unused protocol surface), `apod` (a second image agent)
+and `clinicaltrials`. This session built all five. 45 → 50 agents, 1421 tests, 49/49 live probes.
+
+| Agent | Ask it | Feed that answered (probed 2026-09-23) |
+|---|---|---|
+| `attach` | "what is in this file?" | the file the client attached: `resource` text, or `fs/read_text_file` |
+| `apod` | "show me NASA's picture of the day" | api.nasa.gov/planetary/apod (+ the image itself) |
+| `flights` | "what planes are over Bryant Park, New York right now?" | OpenSky state vectors (65 aircraft in the box) |
+| `company` | "Microsoft's last 10-K", "who filed a 10-K yesterday?" | SEC EDGAR: submissions, browse-edgar atom, daily `.idx` |
+| `clinicaltrials` | "trials for melanoma in Boston" | ClinicalTrials.gov API v2 (396 studies matched) |
+
+### The unused protocol surface, now used
+
+Session 3 proved by search that nothing reads an attached file. `attach` does: it reads the
+`resource` block a client embeds, and when the client advertises `fs.readTextFile` it asks for the
+file over ACP rather than guessing a path. It profiles CSV, TSV, JSON, JSONL, markdown, code and
+plain text, and it counts only what it can count - every number comes with the rule that produced
+it, and the Python function count is labelled a regex match, not a parse. The probe tool learned
+the same trick: its table can now carry prompt blocks, so `attach` is probed with a CSV attached
+(`tests/test_probe.py` checks that those blocks are real).
+
+### What the live data changed in the design
+
+- **`attach` sent a `NameError` instead of an answer.** Any question mentioning rows or columns
+  referenced `MAX_COLUMNS`, which the agent never imported - so the whole turn died and the
+  client got a JSON-RPC error. It survived every test that asked "what is in this file?" and
+  broke on "how many rows and which columns are empty?".
+- **A semicolon table was reported as prose.** The delimiter sniff found `;`, but the parser
+  split on commas, found no columns, and downgraded the file to text with a note saying no
+  delimiter existed - which was false. The sniffed delimiter is now carried into the parse.
+- **`attach` asked permission for a file the client had already said it could not read.** The
+  capability check now comes before the ask, so the answer is "this client does not advertise
+  fs.readTextFile" rather than a permission prompt followed by a failure.
+- **SEC answers 403 twice for two different reasons.** A 403 is both "I will not serve this
+  caller" and "today's index does not exist yet" - measured on `form.20260923.idx` at midday.
+  `company` therefore reads the quarter's own directory listing when an index cannot be fetched,
+  and only calls it missing when the listing agrees.
+- **The daily `.idx` header does not line up with its rows.** The column names are printed on two
+  lines whose indentation matches nothing below them; reading offsets from the header put company
+  names and CIKs in the wrong fields. Rows are now read by shape, anchored on the 8-digit date.
+- **SEC's ticker file contains the ticker `CIK`.** "what is Tesla's CIK?" answered with Credit
+  Suisse Asset Management Income Fund. Real file, real trap: common words are never read as
+  tickers or company names now, and a bare "4" is only a form type after the word "form".
+- **OpenSky answers an empty box with `states: null`.** Not `[]`. Both are handled, and the count
+  is said out loud.
+- **A string parameter through a number formatter killed a turn.** `states(icao24=...)` went
+  through `f"{value:g}"`, so "what is aircraft a487ef?" crashed the agent with a `ValueError`.
+- **"within 50 km of Heathrow" named no place at all**, because the place pattern only knew
+  "over/near/in". A distance form was added, and a radius too big to be real (90000 km) is now
+  capped and shown rather than ignored.
+- **Altitude in ADS-B is barometric**, which is why an airliner on a ramp reads -145 m. The word
+  "barometric" is printed with every altitude, and aircraft in the air are listed before the ones
+  on the ground - otherwise LaGuardia's parked fleet fills a New York answer.
+- **APOD swapped questions instead of refusing them.** "the apod for 1969-07-20" fell through to
+  *today's* picture, because the archive starts in 1995 and the date simply failed to parse. A
+  day the archive cannot answer is now its own answer, naming the day the archive starts; so is
+  "February 30". Video days send NASA's thumbnail with a line saying that is what it is, and an
+  image over 4 MB is linked rather than attached.
+- **ClinicalTrials' `returned` count was not the number of rows printed.** A 40-study fixture
+  produced "showing 40 of them" above a list of 10. The count now reports what the caller was
+  given, and anything held back is counted separately.
+- **A place filter matches a *study*, not a site.** `query.locn=Boston` returned a melanoma study
+  whose first two sites are in Arizona and Arkansas. The matching sites are now found and named,
+  with the study's total site count beside them, and a study that matches nothing in the place
+  says exactly that.
 
 ## Skipped — already a thing
 

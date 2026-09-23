@@ -6,9 +6,9 @@ Every agent on the official ACP list is a coding agent or a coding-agent harness
 are the other kind: agents that answer a real-world question inside Zed, JetBrains or any
 ACP client, straight from a public dataset, with no API key and nothing invented.
 
-- **45 agents** in [`agents/`](./agents)
-- **1189 unit tests**, all offline, all passing
-- **44 live probes** over real ACP stdio against real public data (see [Proof](#proof))
+- **50 agents** in [`agents/`](./agents)
+- **1421 unit tests**, all offline, all passing
+- **49 live probes** over real ACP stdio against real public data (see [Proof](#proof))
 
 ## The agents
 
@@ -16,9 +16,11 @@ ACP client, straight from a public dataset, with no API key and nothing invented
 |---|---|---|
 | [`air`](./agents/air) | "how is the air quality in Delhi right now?", "when does it get worse today?" | Open-Meteo air quality (CAMS) |
 | [`alert`](./agents/alert) | "alert me when the air quality in Delhi passes 200", "tell me when gauge 07010000 reaches flood stage" (silent until it happens) | Open-Meteo + USGS + NWPS + Treasury |
+| [`apod`](./agents/apod) | "show me NASA's picture of the day" (sends the picture itself), "the apod for 1996-01-01" | NASA APOD (api.nasa.gov) |
 | [`art`](./agents/art) | "paintings by Monet", "surprise me with a piece" | Art Institute of Chicago, Cleveland, The Met |
 | [`aurora`](./agents/aurora) | "how are the geomagnetic conditions?", "odds of seeing the aurora in Tromso?" | NOAA SWPC (Kp, OVATION, alerts) |
 | [`archive`](./agents/archive) | "find Apollo 11 recordings", "what is in the item Apollo11Audio?" | Internet Archive |
+| [`attach`](./agents/attach) | "what is in this file?" (reads the file your editor attached and profiles it) | the attached file itself — no feed, no network |
 | [`bikes`](./agents/bikes) | "how many citibikes are available right now?", "nearest station to 40.71,-74.01?" | Citi Bike GBFS (NYC) |
 | [`books`](./agents/books) | "find books about urban foxes", "what has Ursula K. Le Guin written?" | Open Library |
 | [`brief`](./agents/brief) | "brief me on Denver" (asks, then writes `BRIEFING.md` into your workspace) | Open-Meteo + NWS + USGS + open-notify |
@@ -26,10 +28,13 @@ ACP client, straight from a public dataset, with no API key and nothing invented
 | [`chart`](./agents/chart) | "chart the temperature in Seattle for the next 24 hours" (answers with a real PNG) | Open-Meteo + Treasury + USGS |
 | [`chem`](./agents/chem) | "what is the formula for ibuprofen?", "what is Lipitor's generic name?" | PubChem + RxNorm |
 | [`civic`](./agents/civic) | "did complaint 70483808 get fixed?", "complaints near 11235" | NYC Open Data |
+| [`clinicaltrials`](./agents/clinicaltrials) | "trials for melanoma in Boston", "what is trial NCT01065467?" | ClinicalTrials.gov API v2 |
+| [`company`](./agents/company) | "Microsoft's last 10-K", "who filed a 10-K yesterday?" | SEC EDGAR (tickers, submissions, daily index) |
 | [`crypto`](./agents/crypto) | "what is the price of bitcoin?", "how much is locked in DeFi?" | CoinGecko + DefiLlama |
 | [`domains`](./agents/domains) | "when does github.com expire?", "who is the registrar for example.org?" | RDAP (rdap.org) |
 | [`drought`](./agents/drought) | "how dry is California?", "drought in Texas over the last 8 weeks" | US Drought Monitor |
 | [`firehose`](./agents/firehose) | "watch the wiki firehose for 10 edits" (a push stream, not a poll) | Wikimedia EventStreams (SSE) |
+| [`flights`](./agents/flights) | "what planes are over Bryant Park, New York right now?", "what is aircraft a487ef?" | OpenSky state vectors (ADS-B) |
 | [`floodwatch`](./agents/floodwatch) | "is the Mississippi at St. Louis flooding?", "what is gauge EADM7 doing?" | NWS NWPS gauge + USGS site search |
 | [`food`](./agents/food) | "how much sugar is in Nutella?", "is there milk in Oreos?" | Open Food Facts |
 | [`forecast`](./agents/forecast) | "when will it rain in Seattle today?", "what does the week look like?" | Open-Meteo forecast |
@@ -76,7 +81,7 @@ python3 tools/probe.py --agent "python3 agents/forecast/agent.py" \
 # every agent, one live question each
 python3 tools/probe_all.py
 
-# all 1189 unit tests (offline, no network)
+# all 1421 unit tests (offline, no network)
 bash scripts/test-all.sh
 ```
 
@@ -92,56 +97,61 @@ Wire one into Zed or JetBrains — any ACP client takes a command:
 
 ## Proof
 
-Live probe of all 45 agents over real ACP stdio on 2026-09-23 (every answer came from the
+Live probe of all 49 agents over real ACP stdio on 2026-09-23 (every answer came from the
 dataset, not a fixture). `a2a_bridge` is probed only when `ACP_A2A_ENDPOINTS` points at a
-running A2A server, so that run shows 44:
+running A2A server, so that run shows 49:
 
 ```
-[PASS] air         (0.89s) - how is the air quality in Delhi right now?            tool: air-now
-[PASS] alert       (1.48s) - alert me when the air quality in Delhi passes 200 for 1 check every 5 seconds tool: alert-watch
-[PASS] archive     (0.87s) - find Apollo 11 recordings                             tool: archive-search
-[PASS] art         (0.63s) - paintings by Monet                                    tool: art-search
-[PASS] aurora      (0.59s) - how are the geomagnetic conditions right now?         tool: aurora-now
-[PASS] bikes       (0.97s) - how many citibikes are available right now?           tool: bikes-status
-[PASS] books       (0.84s) - find books about urban foxes                          tool: books-search
-[PASS] brief       (7.77s) - brief me on Denver                                    tool: brief-gather
-[PASS] buoys       (1.20s) - what are the conditions at buoy 41025?                tool: buoy-conditions
-[PASS] chart       (1.64s) - chart the temperature in Seattle for the next 12 hours tool: chart-temperature
-[PASS] chem        (1.78s) - what is the formula for ibuprofen?                    tool: chem-compound
-[PASS] civic       (1.08s) - did complaint 70483808 get fixed?                     tool: complaint-status
-[PASS] crypto      (0.53s) - what is the price of bitcoin right now?               tool: crypto-price
-[PASS] domains     (0.49s) - when does example.com expire?                         tool: domain-info
-[PASS] drought     (0.83s) - how dry is California?                                tool: drought-place
-[PASS] firehose    (1.03s) - watch the wiki firehose for 2 edits                   tool: firehose-edits
-[PASS] floodwatch  (1.89s) - what is the Mississippi River at St. Louis doing?     tool: flood-status
-[PASS] food        (1.26s) - how much sugar is in Nutella?                         tool: food-find
-[PASS] forecast    (0.77s) - when will it rain in Seattle today?                   tool: weather-rain
-[PASS] fx          (0.54s) - what is 100 USD in EUR?                               tool: fx-rate
-[PASS] groundwater (1.21s) - water level at site 395847084085500                   tool: groundwater-well
-[PASS] hazards     (0.62s) - any weather alerts in NY right now?                   tool: alerts-active
-[PASS] iss         (1.29s) - could I see the ISS from Denver tonight?              tool: iss-sky
-[PASS] labels      (1.68s) - what is lipitor?                                      tool: label-info
-[PASS] launches    (0.92s) - what is the next launch?                              tool: launches-upcoming
-[PASS] ledger      (1.05s) - what is the national debt right now?                  tool: debt-outstanding
-[PASS] local       (0.51s) - what is going on in this repo?                        tool: git
-[PASS] moon        (1.06s) - when is the next full moon?                           tool: moon-phases
-[PASS] nature      (3.36s) - how many monarch butterflies are recorded in Canada?  tool: nature-count
-[PASS] osm         (1.48s) - nearest drinking water to Bryant Park, New York       tool: osm-near
-[PASS] papers      (0.83s) - papers about CRISPR sickle cell                       tool: papers-search
-[PASS] pollen      (1.34s) - how bad is the pollen today in Denver?                tool: pollen-now
-[PASS] rivers      (0.77s) - what is gauge 06730500 doing right now?               tool: river-stage
-[PASS] snowpack    (2.92s) - how much water is in the California snowpack?         tool: snowpack-state
-[PASS] species     (1.05s) - how many observations of Danaus plexippus are there?  tool: species-count
-[PASS] stocks      (0.61s) - what is AAPL doing right now?                         tool: stock-quote
-[PASS] surf        (1.30s) - how are the waves at Pipeline right now?              tool: surf-now
-[PASS] tides       (2.54s) - when is the next high tide in Boston?                 tool: tide-next
-[PASS] trending    (0.61s) - what is trending on Wikipedia today?                  tool: trending-top
-[PASS] tsunami     (0.47s) - is there a tsunami warning right now?                 tool: tsunami-status
-[PASS] vehicles    (0.35s) - recalls for the 2015 Honda Civic                      tool: vehicle-recalls
-[PASS] watch       (6.62s) - watch the aurora for 3 rounds every 3 seconds         tool: watch-aurora
-[PASS] wiki        (0.43s) - who was Ada Lovelace?                                 tool: wiki-summary
-[PASS] wildfire    (0.79s) - what wildfires are burning in California right now?   tool: wildfire-active
-== 44/44 agent(s) answered a live question  (a2a_bridge skipped: no A2A server running)
+[PASS] air            (0.75s) - how is the air quality in Delhi right now?                                    tool: air-now
+[PASS] alert          (1.12s) - alert me when the air quality in Delhi passes 200 for 1 check every 5 seconds tool: alert-watch
+[PASS] apod           (2.15s) - show me NASA's picture of the day                                             tool: apod-picture
+[PASS] archive        (5.42s) - find Apollo 11 recordings                                                     tool: archive-search
+[PASS] art            (0.63s) - paintings by Monet                                                            tool: art-search
+[PASS] attach         (0.14s) - what is in this file?                                                         tool: attach-profile
+[PASS] aurora         (0.71s) - how are the geomagnetic conditions right now?                                 tool: aurora-now
+[PASS] bikes          (0.80s) - how many citibikes are available right now?                                   tool: bikes-status
+[PASS] books          (0.74s) - find books about urban foxes                                                  tool: books-search
+[PASS] brief          (2.30s) - brief me on Denver                                                            tool: brief-gather
+[PASS] buoys          (0.87s) - what are the conditions at buoy 41025?                                        tool: buoy-conditions
+[PASS] chart          (1.32s) - chart the temperature in Seattle for the next 12 hours                        tool: chart-temperature
+[PASS] clinicaltrials (0.48s) - trials for melanoma in Boston                                                 tool: trials-search
+[PASS] company        (1.22s) - Microsoft's last 10-K                                                         tool: company-filings
+[PASS] chem           (0.43s) - what is the formula for ibuprofen?                                            tool: chem-compound
+[PASS] civic          (1.19s) - did complaint 70483808 get fixed?                                             tool: complaint-status
+[PASS] crypto         (0.47s) - what is the price of bitcoin right now?                                       tool: crypto-price
+[PASS] domains        (0.42s) - when does example.com expire?                                                 tool: domain-info
+[PASS] drought        (0.80s) - how dry is California?                                                        tool: drought-place
+[PASS] firehose       (20.35s) - watch the wiki firehose for 2 edits                                           tool: firehose-edits
+[PASS] flights        (0.81s) - what planes are over Bryant Park, New York right now?                         tool: flights-overhead
+[PASS] floodwatch     (1.77s) - what is the Mississippi River at St. Louis doing?                             tool: flood-status
+[PASS] food           (0.88s) - how much sugar is in Nutella?                                                 tool: food-find
+[PASS] forecast       (0.65s) - when will it rain in Seattle today?                                           tool: weather-rain
+[PASS] fx             (0.33s) - what is 100 USD in EUR?                                                       tool: fx-rate
+[PASS] groundwater    (1.26s) - water level at site 395847084085500                                           tool: groundwater-well
+[PASS] hazards        (0.39s) - any weather alerts in NY right now?                                           tool: alerts-active
+[PASS] iss            (1.39s) - could I see the ISS from Denver tonight?                                      tool: iss-sky
+[PASS] labels         (1.24s) - what is lipitor?                                                              tool: label-info
+[PASS] launches       (1.17s) - what is the next launch?                                                      tool: launches-upcoming
+[PASS] ledger         (1.02s) - what is the national debt right now?                                          tool: debt-outstanding
+[PASS] local          (0.26s) - what is going on in this repo?                                                tool: git
+[PASS] moon           (0.76s) - when is the next full moon?                                                   tool: moon-phases
+[PASS] nature         (3.15s) - how many monarch butterflies are recorded in Canada?                          tool: nature-count
+[PASS] osm            (58.32s) - nearest drinking water to Bryant Park, New York                               tool: osm-near
+[PASS] papers         (0.94s) - papers about CRISPR sickle cell                                               tool: papers-search
+[PASS] pollen         (1.41s) - how bad is the pollen today in Denver?                                        tool: pollen-now
+[PASS] rivers         (0.92s) - what is gauge 06730500 doing right now?                                       tool: river-stage
+[PASS] snowpack       (2.69s) - how much water is in the California snowpack?                                 tool: snowpack-state
+[PASS] species        (1.34s) - how many observations of Danaus plexippus are there?                          tool: species-count
+[PASS] stocks         (0.86s) - what is AAPL doing right now?                                                 tool: stock-quote
+[PASS] surf           (1.35s) - how are the waves at Pipeline right now?                                      tool: surf-now
+[PASS] tides          (0.97s) - when is the next high tide in Boston?                                         tool: tide-next
+[PASS] trending       (0.45s) - what is trending on Wikipedia today?                                          tool: trending-top
+[PASS] tsunami        (0.46s) - is there a tsunami warning right now?                                         tool: tsunami-status
+[PASS] vehicles       (0.48s) - recalls for the 2015 Honda Civic                                              tool: vehicle-recalls
+[PASS] watch          (6.61s) - watch the aurora for 3 rounds every 3 seconds                                 tool: watch-aurora
+[PASS] wiki           (0.34s) - who was Ada Lovelace?                                                         tool: wiki-summary
+[PASS] wildfire       (0.56s) - what wildfires are burning in California right now?                           tool: wildfire-active
+== 49/49 agent(s) answered a live question  (upstream down for chem, firehose)
 ```
 
 The probe also fails an answer that is the agent's **own help text**. That check earns its
@@ -150,49 +160,84 @@ right now?" - a green probe hiding an unanswered question.
 
 The second check names a turn where the agent reported that its feed was down (`I could not
 read ...`). Such a turn is a pass - reporting an outage is the right answer - but it is not
-proof of live data, so the run says `upstream down for osm` instead of quietly counting it.
-That is how the missing third Overpass mirror was found: the run above is the one after the
-fix, where `osm` answered in 1.48s.
+proof of live data, so the run says `upstream down for chem, firehose` instead of quietly
+counting them. That is how the missing third Overpass mirror was found: an earlier run said
+`upstream down for osm`, three mirrors were tried, and `osm` answered in 58.32s above - slow
+by the shared Overpass instance, not stuck.
 
 A few answers verbatim from that run:
 
 ```
-GBIF holds 817,344 occurrence records for Danaus plexippus (Linnaeus, 1758)  • In Canada: 87,502 (10.7%)
-Diamond Shoals, NC (41025, buoy), report at 2026-09-23T00:40Z:
-  Waves: 1.6 m significant height • Wind: 8 m/s from NNE (20 degrees), gusting 10 m/s • Water 28.7 degC
+probe_cities.csv  (csv, 54 bytes, 3 lines, sha256 e72b2ec80f6a7b9d...)
+  - characters 54, blank lines 0, longest line 21 (line 2), ends with a newline: yes
+  - table: 2 row(s) of data, 3 column(s), delimiter ','
+  - header: name, city, pop
+  - sample: springfield, IL, 114394
+  - how I got it: embedded in the prompt
+2026-09-23 - A New Lunar Crater: McGetchin
+  - media: image
+  - NASA / public domain (no separate copyright line on this day)
+  - APOD's own page for this day: https://apod.nasa.gov/apod/ap260923.html
+Aircraft within 25 km of Bryant Park (Bryant Park, Manhattan Community Board 5, Manhattan, New York County, New York, 10018, United States):
+  - 72 in the box (31 in the air, 41 on the ground)
+  - nearest is 3.4 km away  •  highest in the air: 10,051 m (32,975 ft)
+  - N404TD  [a4bd2a]  United States, 3.4 km away
+      altitude 198 m (650 ft) barometric, descending 1.6 m/s
+MICROSOFT CORP (MSFT) - Services-Prepackaged Software:
+  - 6 filing(s) of form 10-K among the last 1002 EDGAR lists for this company (back to 2020-08-07)
+  - 2026-07-29  10-K  period 2026-06-30
+ClinicalTrials.gov for condition: melanoma; place: Boston:
+  - 396 study(ies) match  •  newest record update first, showing 10 of them
+  - NCT04044859  ADP-A2M4CD8 as Monotherapy or in Combination With Either Nivolumab or Pembrolizumab ... (SURPASS)
+      status active not recruiting, interventional, phase 1
+      sites matching Boston: 1 of 17
+        Massachusetts General Hospital, Boston, Massachusetts, United States
+Air quality at 28.61,77.21 as of 2026-09-23T17:00 UTC:
+  • US AQI 157 - Unhealthy (European AQI 87, a different scale)
+  • PM2.5 107.6 ug/m3 - very high; PM10 120.1 ug/m3
+Diamond Shoals, NC (41025, buoy), report at 2026-09-23T16:50Z:
+  • Waves: 2 m significant height with a dominant period of 8 s
+  • Wind: 14 m/s from NE (50 degrees), gusting 18 m/s  •  Water temperature: 25.5 degC
+CA - drought as of 2026-09-15 (week ending 2026-09-21):
+  65.23% of the area is at least abnormally dry (D0 or worse)
+  22.32% at least moderate drought (D1+)
 EADM7 - Mississippi River at St. Louis (MO, St. Louis City), forecast by NCRFC:
-  Observed: 13.21 ft, flow 236 kcfs - no flooding • Flood stages here: action 28 ft, minor 30 ft
-Pipeline (21.66,-158.05) at 2026-09-22T15:15 (Pacific/Honolulu):
-  Waves: 1.7 m significant height (fun, waist to chest high), 8.1 s period from NE - windswell
-  Read: onshore - wind is coming out of the same quarter as the swell
-Repository .../awesome-acps on main, tracking origin/main, 0 ahead and 0 behind
-  Working tree: 0 staged, 1 modified, 6 untracked • Last commit: 57df985 by mrfentmen
-Watching the one-minute planetary K index, 3 rounds 3 s apart:
-  Round 1/3 [2026-09-23T01:10:00Z] Kp 0.00 - below storm level - first reading
-  Round 2/3 [2026-09-23T01:10:00Z] Kp 0.00 - below storm level - no change since the last round
-Watching the space station, 3 rounds 3 s apart:
-  Round 2/3 station at 51.39 N, 123.31 W - moved 21 km in 3s (6.9 km/s)
-The next high tide for BOSTON, MA (8443970):
-  - right now: 8.19 ft above MLLW (the gauge read 2026-09-22 23:00 station local time)
-  - next HIGH 8.72 ft at 2026-09-23 09:39
+  • Observed: 14.3 ft, flow 250 kcfs as of 2026-09-23T16:30:00Z - no flooding
+  • Flood stages here: action 28 ft, minor 30 ft, moderate 35 ft, major 40 ft
+The US total public debt outstanding was $40,112,118,151,111.92 ($40.11 trillion) on 2026-09-21, up $10,617,634,399.83 on the previous business day.
+  • Held by the public: $32,402,191,477,341.65
+Repository /Users/dtaxk/Desktop/awesome-acps at 2026-09-23T17:21:32Z:
+  • Branch: main, tracking origin/main, 0 ahead and 0 behind
+  • Working tree: 0 staged, 4 modified, 6 untracked
 Drinking water near Bryant Park (40.7538, -73.9835) within 800 m:
   - 60 m  (unnamed on OpenStreetMap) (wheelchair: yes)
   OpenStreetMap has 11 mapped within 800 m.
-Watching the US Air Quality Index at a place - above 200. Up to 1 round(s), 5s apart (5s at most).
-  Not met after 1 check(s) in 1s (last reading 153 AQI). Nothing is still checking now.
+CA - snow water equivalent (in), from every SNOTEL snow station in the state:
+  36 station(s) reported a value; 16 of them have any snow water equivalent at all
+  every station's median for today is 0 in, so percent of normal does not exist off season - it is 0 divided by 0
+pipeline (21.66,-158.05) at 2026-09-23T07:15 (Pacific/Honolulu):
+  • Waves: 2 m significant height (solid, overhead), 7.8 s period from ENE (73 degrees) - windswell
+  • Read: onshore - wind is coming out of the same quarter as the swell, so it is pushing in (0 degrees apart)
+The next high tide for BOSTON, MA (8443970):
+  - right now: 5.15 ft above MLLW (the gauge read 2026-09-23 13:18 station local time)
+  - next HIGH 9.65 ft at 2026-09-23 21:49
+No tsunami bulletin is in force right now.
+  newest bulletin: Tsunami Information from NWS Pacific Tsunami Warning Center (Honolulu, Hawaii)
+    expired 2026-09-18T14:25:30+00:00 - 123 h ago  •  area: VICINITY OF PUERTO RICO
+Watching the one-minute planetary K index, NOAA SWPC for 3 round(s), 3s apart (9s at most). Cancel the turn to stop early.
+Round 1/3 [2026-09-23T17:17:00Z] Kp 0.33 - below storm level - first reading
+Not met after 1 check(s) in 1s (last reading 157 AQI). Nothing is still checking now.
 2,074 item(s) match 'Apollo 11' (audio) in the Internet Archive:
   Apollo11Audio - Apollo 11 - audio, NASA - 295,152 downloads
   (I showed the 3 most downloaded of 2,074)
-Nutella (Nutella - 400 g e)  •  sugars: 56.8 g per 100 g  •  Nutri-Score: e (worst)  •  NOVA 4
-  allergens: milk, nuts, soybeans  •  ingredients: Sugar, palm oil, HAZELNUTS 13%, cocoa.
-CA - drought as of 2026-09-15 (week ending 2026-09-21):
-  65.23% of the area is at least abnormally dry (D0 or worse)  •  34.77% has no drought at all
+631 product(s) named 'Nutella' in Open Food Facts:
+  Nutella & go! hazelnut spread + breadsticks (['Nutella'])
+    sugars: 44.2 g per 100 g  •  allergens: gluten
 MI-3A OH (395847084085500) - Miami County, Ohio - well depth 130 ft
-  depth to water: 9.95 ft below land surface on 2026-09-22 (Provisional)
-CO - snow water equivalent (in), from every SNOTEL snow station in the state:
-  118 station(s) reported a value; 41 of them have any snow water equivalent at all
-No tsunami bulletin is in force right now.
-  newest bulletin: Tsunami Information from PTWC Honolulu, expired 2026-09-18T14:25:30+00:00
+Next launches in Launch Library:
+  • Long March 8A | SatNet LEO Group 26 - 2026-09-23T13:32:00Z [Success]
+Sky check for 39.74,-104.99 at 2026-09-23T17:21:28Z:
+  • cloud cover now 100%  •  it is nowhere near you at this moment, so no sighting now
 ```
 
 ## What every agent guarantees
@@ -208,7 +253,7 @@ No tsunami bulletin is in force right now.
   one message per round, pushed on an interval, and `session/cancel` stops it immediately.
 - **Provenance.** Every answer names the dataset id and its units, and states the limits
   (a model run, a reference rate, one gauge at one time, catalog counts not sales).
-- **No keys.** All 45 use keyless public APIs. Nothing to sign up for, nothing to leak.
+- **No keys.** All 50 use keyless public APIs. Nothing to sign up for, nothing to leak.
   ([`local`](./agents/local) uses no API at all — it reads this machine.)
 
 ## Layout
@@ -252,6 +297,8 @@ for when you point one at a server of your own, or want a different cache window
 | `<AGENT>_USER_AGENT` | every agent | the `User-Agent` it sends (e.g. `HAZARDS_USER_AGENT`, `WATCH_AGENT_USER_AGENT`). Set a contactable one if you run these anywhere public |
 | `<AGENT>_HTTP_TIMEOUT` | every agent | seconds to wait on a feed, default 20-25 |
 | `<AGENT>_CACHE_TTL` | every agent | seconds a read is reused, default 60-900 depending on the feed's own limits |
+| `NASA_API_KEY` | [`apod`](./agents/apod) | a free key from api.nasa.gov; without it the agent uses `DEMO_KEY`, which NASA rate-limits by address (30 an hour, 50 a day) |
+| `SEC_USER_AGENT` | [`company`](./agents/company) | the contact line SEC asks every caller for (`name/version (contact)`); set your own if EDGAR refuses the default |
 | `WATCH_AGENT_ROUNDS`, `WATCH_AGENT_INTERVAL` | [`watch`](./agents/watch) | the default rounds and gap between pushed updates (3 and 15s) |
 | `LOCAL_AGENT_TIMEOUT` | [`local`](./agents/local) | seconds before a `git` or `lsof` read is given up on (10) |
 | `FIREHOSE_HTTP_TIMEOUT` | [`firehose`](./agents/firehose) | seconds to wait on the event stream before giving up (20) |
@@ -259,6 +306,8 @@ for when you point one at a server of your own, or want a different cache window
 | `ALERT_HTTP_TIMEOUT` | [`alert`](./agents/alert) | seconds to wait on one condition check (25) |
 | `ACP_A2A_ENDPOINTS` | [`a2a_bridge`](./agents/a2a_bridge) | `name=url,...` of A2A servers to reach |
 | `ACP_BRIDGE_PUSH_PORT` | [`a2a_bridge`](./agents/a2a_bridge) | local port the A2A push webhook listens on |
+
+`.env.example` lists the same variables with the credential ones first.
 
 ## Honest limits
 
@@ -277,6 +326,27 @@ for when you point one at a server of your own, or want a different cache window
 - Fast-moving data is labelled as such in the answer: launch windows move, model output is
   not a measurement, ECB rates skip weekends and holidays, and a reference rate is not a
   tradeable rate.
+- [`attach`](./agents/attach) is the only agent that reads something you hand it rather than a
+  feed: either the text your client embedded in the prompt or, when the client advertises
+  `fs.readTextFile`, the file it asks for over ACP. It counts what it can count and prints the
+  rule beside each number — a "function count" for Python is a regex match, not a parse, and the
+  answer says so. Nothing leaves the machine, and no file is ever written.
+- [`apod`](./agents/apod) sends NASA's own text whole rather than summarising it, so the words
+  are NASA's. Video days carry a thumbnail, not the video, and an image over 4 MB is linked
+  rather than attached. The archive starts in 1995, and a day before that is reported as a day
+  the archive cannot answer rather than swapped for today's picture.
+- [`flights`](./agents/flights) reads aircraft-broadcast ADS-B, so an aircraft that is not
+  broadcasting is simply absent — an empty answer is not an empty sky. Altitude is barometric,
+  which is why a parked airliner can read a negative number; the word "barometric" is printed
+  with every altitude, and aircraft in the air are listed before the ones on the ground.
+- [`company`](./agents/company) reads what a filer filed, and says so: EDGAR's `filings.recent`
+  holds roughly the latest 1,000 filings rather than the whole history, so an answer says how far
+  back it looked. The daily index is the one the SEC publishes; when today's is not posted yet,
+  the answer says that instead of calling it an error.
+- [`clinicaltrials`](./agents/clinicaltrials) is the sponsor's own registry record, so a status
+  is the sponsor's word, and a place filter matches a study that lists a site there rather than
+  the site itself — the matching sites are named, with the study's total site count beside them.
+  It is not medical advice.
 - [`watch`](./agents/watch) polls, because USGS, NOAA SWPC and open-notify publish no push
   channel to subscribe to. It is capped at 20 rounds and 180 seconds, it sleeps on the
   session's own cancel event, and nothing keeps running after the turn.
@@ -334,10 +404,10 @@ for when you point one at a server of your own, or want a different cache window
   never reported - and it says how many navigation titles (front page, search) it dropped from
   the raw top list.
 - [`osm`](./agents/osm) depends on a shared Overpass instance and can take 10-40s; the probe run
-  in this README caught a 39s turn. It is slow, not stuck. All three mirrors were tried on
-  2026-09-23: `overpass-api.de` answered 504, `kumi.systems` timed out, and the third
-  (`maps.mail.ru`, from QuickOSM's mirror list) answered in 22s, so a turn can now succeed
-  where it used to report an outage.
+  above caught a 58s turn. It is slow, not stuck. All three mirrors were tried on 2026-09-23:
+  `overpass-api.de` answered 504, `kumi.systems` timed out, and the third (`maps.mail.ru`, from
+  QuickOSM's mirror list) answered in 22s, so a turn can now succeed where it used to report an
+  outage.
 - An agent that does not know a place says so by name instead of guessing coordinates.
 
 ## License
